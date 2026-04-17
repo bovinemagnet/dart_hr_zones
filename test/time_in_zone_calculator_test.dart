@@ -182,5 +182,88 @@ void main() {
       const r = HrReading(bpm: 145, elapsed: Duration(minutes: 3));
       expect(r.toString(), contains('145'));
     });
+
+    test('inequality on elapsed', () {
+      const a = HrReading(bpm: 120, elapsed: Duration(minutes: 1));
+      const b = HrReading(bpm: 120, elapsed: Duration(minutes: 2));
+      expect(a, isNot(equals(b)));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // bpm below zone 1 — interval is dropped, not credited to any zone
+  // -------------------------------------------------------------------------
+  group('bpm below zone 1', () {
+    test('interval starting below zone 1 lower is ignored', () {
+      // Age 40 Tanaka → max 180. Zone 1 lower = 90.
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 80, elapsed: Duration.zero),
+        const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+        const HrReading(bpm: 100, elapsed: Duration(minutes: 8)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      // First interval (bpm 80) is credited nowhere; second (bpm 95) → zone 1.
+      expect(summary.durationInZone(1), const Duration(minutes: 5));
+      final total = summary.zoneDurations.fold<Duration>(
+        Duration.zero,
+        (acc, zd) => acc + zd.duration,
+      );
+      expect(total, const Duration(minutes: 5));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // recoveryHrDrop uses the global peak, not the penultimate reading
+  // -------------------------------------------------------------------------
+  group('recoveryHrDrop — peak discovery', () {
+    test('peak earlier in the session is still the reference', () {
+      final readings = [
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 185, elapsed: Duration(seconds: 10)), // peak
+        const HrReading(bpm: 160, elapsed: Duration(seconds: 20)),
+        const HrReading(bpm: 140, elapsed: Duration(seconds: 30)),
+        const HrReading(bpm: 110, elapsed: Duration(seconds: 90)), // last
+      ];
+      final summary = calculateTimeInZones(readings, _config());
+      // last gap = 60s ≥ 55s → drop populated = 185 − 110.
+      expect(summary.recoveryHrDrop, 75);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Zone 5 accumulation — confirms open-upper zone participates in totals
+  // -------------------------------------------------------------------------
+  group('zone 5 accumulation', () {
+    test('readings above estimated max accumulate in zone 5', () {
+      // Age 40 Tanaka → max 180. Zone 5 lower = 162.
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 200, elapsed: Duration(minutes: 4)),
+        const HrReading(bpm: 100, elapsed: Duration(minutes: 7)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      expect(summary.durationInZone(5), const Duration(minutes: 7));
+      expect(summary.moderateOrHigherDuration, const Duration(minutes: 7));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ZoneDuration.toString — cheap lock
+  // -------------------------------------------------------------------------
+  group('ZoneDuration.toString', () {
+    test('mentions zone number and duration', () {
+      final summary = calculateTimeInZones(
+        [
+          const HrReading(bpm: 95, elapsed: Duration.zero),
+          const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+        ],
+        _config(),
+      );
+      final zone1 = summary.zoneDurations.first;
+      expect(zone1.toString(), contains('1'));
+      expect(zone1.toString(), contains('0:03:00'));
+    });
   });
 }

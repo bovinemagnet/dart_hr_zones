@@ -2,7 +2,7 @@
 
 [![pub.dev](https://img.shields.io/pub/v/hr_zones.svg)](https://pub.dev/packages/hr_zones)
 [![CI](https://github.com/bovinemagnet/dart_hr_zones/actions/workflows/ci.yaml/badge.svg)](https://github.com/bovinemagnet/dart_hr_zones/actions/workflows/ci.yaml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A **pure-Dart** heart rate zone calculator with five calculation methods,
 automatic priority selection, reliability grading, and time-in-zone analysis.
@@ -232,4 +232,4 @@ dart pub get
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)

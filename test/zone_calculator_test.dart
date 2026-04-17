@@ -440,5 +440,263 @@ void main() {
       expect(zone.containsBpm(120), isFalse);
     });
     test('false below lower', () => expect(zone.containsBpm(99), isFalse));
+
+    test('open upper bound (null) includes arbitrarily high bpm', () {
+      const top = CalculatedZone(
+        zoneNumber: 5,
+        label: 'Zone 5',
+        effortLabel: 'Very Hard',
+        descriptiveLabel: 'VO\u2082 Max',
+        lowerBound: 162,
+        color: 0xFFE57373,
+      );
+      expect(top.containsBpm(162), isTrue);
+      expect(top.containsBpm(250), isTrue);
+      expect(top.containsBpm(161), isFalse);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // CalculatedZone equality & string forms
+  // -------------------------------------------------------------------------
+  group('CalculatedZone equality', () {
+    const a = CalculatedZone(
+      zoneNumber: 3,
+      label: 'Zone 3',
+      effortLabel: 'Moderate',
+      descriptiveLabel: 'Aerobic',
+      lowerBound: 126,
+      upperBound: 144,
+      color: 0xFFFFD54F,
+    );
+    const b = CalculatedZone(
+      zoneNumber: 3,
+      // Different cosmetic fields — equality ignores these.
+      label: 'Zone Three',
+      effortLabel: 'Tempo',
+      descriptiveLabel: 'Custom',
+      lowerBound: 126,
+      upperBound: 144,
+      color: 0xFF000000,
+    );
+    const c = CalculatedZone(
+      zoneNumber: 3,
+      label: 'Zone 3',
+      effortLabel: 'Moderate',
+      descriptiveLabel: 'Aerobic',
+      lowerBound: 126,
+      upperBound: 145, // differs
+      color: 0xFFFFD54F,
+    );
+
+    test('equal when zoneNumber + bounds match', () {
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('unequal when upperBound differs', () {
+      expect(a, isNot(equals(c)));
+    });
+
+    test('toString includes zone number and bounds', () {
+      expect(a.toString(), contains('3'));
+      expect(a.toString(), contains('126'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ZoneConfiguration.toString
+  // -------------------------------------------------------------------------
+  group('ZoneConfiguration.toString', () {
+    test('includes method, reliability, maxHr', () {
+      const profile = HealthProfile(age: 40);
+      final s = calculateZones(profile)!.toString();
+      expect(s, contains('percentOfEstimatedMax'));
+      expect(s, contains('medium'));
+      expect(s, contains('180'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Assert enforcement — override lists must have exactly 5 entries
+  // -------------------------------------------------------------------------
+  group('override list length asserts', () {
+    const profile = HealthProfile(age: 30);
+
+    test('bands length != 5 throws AssertionError', () {
+      expect(
+        () => calculateZones(
+          profile,
+          bands: const [(50.0, 60.0), (60.0, 70.0)],
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('labels length != 5 throws', () {
+      expect(
+        () => calculateZones(profile, labels: const ['a', 'b', 'c']),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('effortLabels length != 5 throws', () {
+      expect(
+        () => calculateZones(profile, effortLabels: const ['a']),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('descriptiveLabels length != 5 throws', () {
+      expect(
+        () => calculateZones(profile, descriptiveLabels: const ['a']),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('colors length != 5 throws', () {
+      expect(
+        () => calculateZones(profile, colors: const [0xFF000000]),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // colors override is applied
+  // -------------------------------------------------------------------------
+  group('colors override', () {
+    test('propagates supplied packed colours', () {
+      const colours = <int>[
+        0xFF111111,
+        0xFF222222,
+        0xFF333333,
+        0xFF444444,
+        0xFF555555,
+      ];
+      const profile = HealthProfile(age: 40);
+      final config = calculateZones(profile, colors: colours)!;
+      for (var i = 0; i < 5; i++) {
+        expect(config.zones[i].color, colours[i]);
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Caution mode falling through to percentOfEstimatedMax (age-only profile)
+  // -------------------------------------------------------------------------
+  group('Caution mode with only estimated max', () {
+    test('age + betaBlocker → percentOfEstimatedMax, low reliability', () {
+      const profile = HealthProfile(age: 49, betaBlocker: true);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
+      expect(config.reliability, ZoneReliability.low);
+      expect(config.reason, contains('Caution'));
+      expect(config.reason, contains('beta blocker'));
+      expect(config.reason, contains('Tanaka'));
+    });
+
+    test('age + heartCondition alone also downgrades estimated-max path', () {
+      const profile = HealthProfile(age: 55, heartCondition: true);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
+      expect(config.reliability, ZoneReliability.low);
+      expect(config.reason, contains('heart condition'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Clinician cap reason string never mentions caution, even when flags set
+  // -------------------------------------------------------------------------
+  group('Clinician cap reason string', () {
+    test('reason mentions clinician, not caution, with beta blocker', () {
+      const profile = HealthProfile(
+        age: 49,
+        clinicianMaxHr: 150,
+        betaBlocker: true,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.reason, contains('clinician'));
+      expect(config.reason, isNot(contains('Caution')));
+      expect(config.reason, isNot(contains('beta blocker')));
+    });
+
+    test('reason unchanged when both caution flags set', () {
+      const profile = HealthProfile(
+        clinicianMaxHr: 140,
+        betaBlocker: true,
+        heartCondition: true,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.reason, 'Using clinician-provided maximum heart rate');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Nes formula end-to-end via calculateZones
+  // -------------------------------------------------------------------------
+  group('Nes formula through calculateZones', () {
+    test('age 30 with Nes → max 192, reason references Nes', () {
+      const profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
+      final config = calculateZones(profile)!;
+      expect(config.maxHr, 192);
+      expect(config.reason, contains('Nes'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Karvonen with fox220 opt-in (age-estimated max)
+  // -------------------------------------------------------------------------
+  group('Karvonen with fox220', () {
+    test('uses 220 − age for max HR in Karvonen formula', () {
+      // max = 220 − 40 = 180, HRR = 180 − 60 = 120.
+      // zone 1 lower = 120 × 0.50 + 60 = 120.
+      const profile = HealthProfile(
+        age: 40,
+        restingHr: 60,
+        maxHrFormula: MaxHrFormula.fox220,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.hrrKarvonen);
+      expect(config.maxHr, 180);
+      expect(config.zones[0].lowerBound, 120);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Custom zones expose 0 percents (percentages are not applicable)
+  // -------------------------------------------------------------------------
+  group('custom zone percentages', () {
+    test('lowerPercent and upperPercent are 0 for all custom zones', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+      );
+      final config = calculateZones(profile)!;
+      for (final z in config.zones) {
+        expect(z.lowerPercent, 0);
+        expect(z.upperPercent, 0);
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // currentZoneFromConfig at exclusive upper boundary crosses to next zone
+  // -------------------------------------------------------------------------
+  group('currentZoneFromConfig at zone boundary', () {
+    test('bpm at zone N upper bound is in zone N+1 (upper is exclusive)', () {
+      // Age 40, Tanaka → max 180. Zone 1 upper = 108, which is zone 2's lower.
+      const profile = HealthProfile(age: 40);
+      final config = calculateZones(profile)!;
+      final boundary = config.zones[0].upperBound!;
+      expect(config.zones[1].lowerBound, boundary);
+      final zone = currentZoneFromConfig(boundary, config);
+      expect(zone?.zoneNumber, 2);
+    });
   });
 }

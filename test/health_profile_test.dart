@@ -86,6 +86,65 @@ void main() {
       expect(copy.restingHr, isNull);
       expect(copy.age, 40);
     });
+
+    test('copyWith clearAge resets age', () {
+      const profile = HealthProfile(age: 40, restingHr: 60);
+      final copy = profile.copyWith(clearAge: true);
+      expect(copy.age, isNull);
+      expect(copy.restingHr, 60);
+    });
+
+    test('copyWith clearClinicianMaxHr resets clinician cap', () {
+      const profile = HealthProfile(age: 40, clinicianMaxHr: 150);
+      final copy = profile.copyWith(clearClinicianMaxHr: true);
+      expect(copy.clinicianMaxHr, isNull);
+      expect(copy.age, 40);
+    });
+
+    test('copyWith clearMeasuredMaxHr resets measured max', () {
+      const profile = HealthProfile(measuredMaxHr: 185);
+      final copy = profile.copyWith(clearMeasuredMaxHr: true);
+      expect(copy.measuredMaxHr, isNull);
+    });
+
+    test('copyWith clearCustomZones resets custom zones', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+      );
+      final copy = profile.copyWith(clearCustomZones: true);
+      expect(copy.customZones, isNull);
+    });
+
+    test('copyWith can set betaBlocker / heartCondition', () {
+      const profile = HealthProfile(age: 40);
+      final beta = profile.copyWith(betaBlocker: true);
+      expect(beta.betaBlocker, isTrue);
+      expect(beta.isCautionMode, isTrue);
+      expect(beta.heartCondition, isFalse);
+
+      final condition = profile.copyWith(heartCondition: true);
+      expect(condition.heartCondition, isTrue);
+      expect(condition.isCautionMode, isTrue);
+    });
+
+    test('isCautionMode true when both flags set', () {
+      const profile = HealthProfile(betaBlocker: true, heartCondition: true);
+      expect(profile.isCautionMode, isTrue);
+    });
+
+    test('toString surfaces key fields', () {
+      const profile = HealthProfile(age: 42, restingHr: 58, betaBlocker: true);
+      final s = profile.toString();
+      expect(s, contains('42'));
+      expect(s, contains('58'));
+      expect(s, contains('betaBlocker: true'));
+    });
   });
 
   group('MaxHrFormula', () {
@@ -166,6 +225,37 @@ void main() {
         labels: ['A', 'B', 'C', 'D', 'E'],
       );
       expect(a, isNot(equals(c)));
+    });
+
+    test('inequality when a single boundary differs', () {
+      const a = CustomZoneBoundary(
+        zone1Lower: 95,
+        zone2Lower: 114,
+        zone3Lower: 133,
+        zone4Lower: 152,
+        zone5Lower: 171,
+      );
+      const b = CustomZoneBoundary(
+        zone1Lower: 95,
+        zone2Lower: 115, // differs
+        zone3Lower: 133,
+        zone4Lower: 152,
+        zone5Lower: 171,
+      );
+      expect(a, isNot(equals(b)));
+    });
+
+    test('toString lists every boundary', () {
+      const boundary = CustomZoneBoundary(
+        zone1Lower: 95,
+        zone2Lower: 114,
+        zone3Lower: 133,
+        zone4Lower: 152,
+        zone5Lower: 171,
+      );
+      final s = boundary.toString();
+      expect(s, contains('95'));
+      expect(s, contains('171'));
     });
   });
 }
