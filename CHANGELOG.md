@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TimeInZoneSummary` with `zoneDurations`, `moderateOrHigherDuration`,
   `recoveryHrDrop`, and `durationInZone(int)` helper.
 - `ReadingCadence.cooldownGap` default constant.
-- Full test suite (86 tests).
+- Full test suite (123 tests) covering the zone calculator, health profile,
+  time-in-zone calculator, and end-to-end integration pipeline.
 - CLI example (`example/hr_zones_example.dart`) demonstrating all five methods
   and time-in-zone analysis.
 - GitHub Actions CI workflow (Dart analyze + test on three SDK versions).
