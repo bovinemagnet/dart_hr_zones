@@ -31,5 +31,10 @@ jobs:
       - name: Publish (dry-run)
         run: dart pub publish --dry-run
 
-      - name: Publish
-        run: dart pub publish --force
+      # Automated publishing to pub.dev is disabled. We publish locally with
+      # `dart pub publish` for now. To re-enable:
+      #   1. Enable "Automated publishing from GitHub Actions" on
+      #      https://pub.dev/packages/hr_zones/admin
+      #   2. Uncomment the step below.
+      # - name: Publish
+      #   run: dart pub publish --force
