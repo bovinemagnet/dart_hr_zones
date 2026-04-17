@@ -1,0 +1,28 @@
+flowchart TD
+    START([HealthProfile]) --> A{customZones set?}
+
+    A -- Yes --> M1[ZoneMethod.custom]
+    A -- No  --> B{clinicianMaxHr set?}
+
+    B -- Yes --> M2[ZoneMethod.clinicianCap]
+    B -- No  --> C{lactateThresholdHr set?}
+
+    C -- Yes --> M3[ZoneMethod.lthrFriel]
+    C -- No  --> D{restingHr set AND\nmaxHr resolvable?}
+
+    D -- Yes --> M4[ZoneMethod.hrrKarvonen]
+    D -- No  --> E{measuredMaxHr set?}
+
+    E -- Yes --> M5[ZoneMethod.percentOfMeasuredMax]
+    E -- No  --> F{age available for\nestimated maxHr?}
+
+    F -- Yes --> M6[ZoneMethod.percentOfEstimatedMax]
+    F -- No  --> NULL([returns null])
+
+    classDef method fill:#1565C0,color:#fff,stroke:#0D47A1
+    classDef decision fill:#FFF9C4,stroke:#F9A825,color:#333
+    classDef terminal fill:#9E9E9E,color:#fff,stroke:#757575
+
+    class M1,M2,M3,M4,M5,M6 method
+    class A,B,C,D,E,F decision
+    class NULL terminal

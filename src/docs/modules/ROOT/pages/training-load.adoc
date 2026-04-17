@@ -1,0 +1,196 @@
+= Training Load (TRIMP)
+Paul Snow
+:description: Edwards and Banister TRIMP training-load formulas, inputs, sample calculations, and null conditions.
+
+`hr_zones` provides two industry-standard training-load scores.
+Both are pure functions — no state is stored in the result types.
+
+== Edwards TRIMP
+
+=== Overview
+
+Edwards TRIMP (Edwards, 1993) is a simple zone-weighted training load score.
+Each zone's time is multiplied by the zone number and the results are summed:
+
+[source,text]
+----
+Edwards TRIMP = 1 × z1_minutes + 2 × z2_minutes + 3 × z3_minutes
+              + 4 × z4_minutes + 5 × z5_minutes
+----
+
+A 30-minute zone-3 session scores 90 TRIMP units.
+A 20-minute zone-4 interval scores 80.
+The score grows non-linearly with intensity: an hour in zone 1 (60) is worth less than 15 minutes in zone 5 (75).
+
+=== Signature
+
+[source,dart]
+----
+double calculateEdwardsTrimp(TimeInZoneSummary summary)
+----
+
+=== Inputs
+
+`calculateEdwardsTrimp` takes a `TimeInZoneSummary` from `calculateTimeInZones`.
+It works with any zone configuration — max-HR-based, LTHR-anchored, or custom.
+
+=== Example
+
+[source,dart]
+----
+final readings = [
+  HrReading(bpm: 120, elapsed: Duration.zero),
+  HrReading(bpm: 140, elapsed: Duration(minutes: 20)),  // 20 min in zone 2
+  HrReading(bpm: 158, elapsed: Duration(minutes: 40)),  // 20 min in zone 3
+];
+
+final config = calculateZones(HealthProfile(age: 35, restingHr: 60))!;
+final summary = calculateTimeInZones(readings, config);
+final edwards = calculateEdwardsTrimp(summary);
+
+print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
+// 20 min × 2 (zone 2) + 20 min × 3 (zone 3) = 40 + 60 = 100
+----
+
+=== When it returns zero
+
+`calculateEdwardsTrimp` always returns a `double` (never `null`).
+It returns `0.0` only when the summary contains no zone time — for example when all readings are below zone 1's lower bound.
+
+== Banister TRIMP
+
+=== Overview
+
+Banister TRIMP (Banister, 1991) weights each interval by its heart rate reserve fraction with an exponential term, reflecting the non-linear physiological cost of high-intensity exercise:
+
+[source,text]
+----
+Banister TRIMP = sum over each interval of:
+  delta_t_minutes * HRRf * a * exp(b * HRRf)
+
+where:
+  HRRf  = (heart_rate - resting_hr) / (max_hr - resting_hr)
+           clamped to [0, 1]
+  a, b  = sex-specific or cohort-specific coefficients
+----
+
+The earlier reading's bpm is used as `heart_rate` for its interval, consistent with `calculateTimeInZones`.
+
+=== Signature
+
+[source,dart]
+----
+double? calculateBanisterTrimp(
+  List<HrReading> readings,
+  HealthProfile profile, {
+  BanisterCoefficients coefficients = const BanisterCoefficients.male(),
+})
+----
+
+=== Inputs
+
+[cols="2,3", options="header"]
+|===
+|Parameter |Description
+
+|`readings` |`List<HrReading>` — same list used for time-in-zone (order matters)
+|`profile` |`HealthProfile` — must supply `restingHr` and a resolvable max HR
+|`coefficients` |`BanisterCoefficients` — defaults to `BanisterCoefficients.male()`
+|===
+
+=== When it returns null
+
+`calculateBanisterTrimp` returns `null` when:
+
+* `profile.restingHr` is `null`, or
+* neither `profile.measuredMaxHr` nor `profile.estimatedMaxHr` is available (i.e. `age` is also `null`).
+
+It returns `0.0` when `readings` has fewer than two samples.
+
+NOTE: Unlike `calculateEdwardsTrimp`, Banister TRIMP needs HR reserve values, so both resting HR and max HR are mandatory.
+Always check for `null` before displaying the result.
+
+=== BanisterCoefficients
+
+`BanisterCoefficients` holds the `a` and `b` pair used in the exponential weighting term.
+
+[cols="2,2,2", options="header"]
+|===
+|Constructor |a |b
+
+|`BanisterCoefficients.male()` |0.64 |1.92
+|`BanisterCoefficients.female()` |0.86 |1.67
+|`BanisterCoefficients({required a, required b})` |custom |custom
+|===
+
+Banister's original paper reports sex-specific coefficients reflecting different lactate-response curves.
+Use the custom constructor when working with a clinical cohort that has published its own validated pair.
+
+=== Example
+
+[source,dart]
+----
+final readings = [
+  HrReading(bpm: 95,  elapsed: Duration.zero),
+  HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
+  HrReading(bpm: 155, elapsed: Duration(minutes: 15)),
+  HrReading(bpm: 110, elapsed: Duration(minutes: 16)),
+];
+
+final profile = HealthProfile(age: 40, restingHr: 60);
+
+// Male coefficients (default)
+final banisterM = calculateBanisterTrimp(readings, profile);
+print('Banister (male): ${banisterM?.toStringAsFixed(2)}');
+
+// Female coefficients
+final banisterF = calculateBanisterTrimp(
+  readings,
+  profile,
+  coefficients: BanisterCoefficients.female(),
+);
+print('Banister (female): ${banisterF?.toStringAsFixed(2)}');
+
+// Custom cohort coefficients
+final banisterCustom = calculateBanisterTrimp(
+  readings,
+  profile,
+  coefficients: const BanisterCoefficients(a: 0.75, b: 1.80),
+);
+----
+
+=== Measured max vs age-estimated max
+
+`calculateBanisterTrimp` uses `profile.measuredMaxHr` in preference to the age estimate.
+If only `age` is provided, `profile.estimatedMaxHr` (via `maxHrFormula`) is used.
+This mirrors the behaviour of `calculateZones`.
+
+== Choosing between Edwards and Banister
+
+[cols="2,3,3", options="header"]
+|===
+|Criterion |Edwards |Banister
+
+|Inputs required |`TimeInZoneSummary` only |`List<HrReading>`, `HealthProfile` (restingHr + max HR)
+|Returns `null` |Never |When required profile data is missing
+|Sensitivity |Zone-level granularity |Per-reading granularity
+|Non-linearity |Linear (zone multiplier) |Exponential (HRR fraction)
+|Typical use |Quick load summary; zone-model coaching |Research; HRR-based periodisation
+|===
+
+For most coaching applications Edwards is simpler and sufficient.
+Use Banister when you need finer sensitivity to high-intensity intervals or when your methodology is explicitly HRR-based.
+
+== Passing both scores together
+
+[source,dart]
+----
+final config = calculateZones(profile)!;
+final summary = calculateTimeInZones(readings, config);
+
+final edwards  = calculateEdwardsTrimp(summary);
+final banister = calculateBanisterTrimp(readings, profile);
+
+print('Edwards:  ${edwards.toStringAsFixed(1)}');
+print('Banister: ${banister?.toStringAsFixed(2) ?? "n/a (missing profile data)"}');
+----

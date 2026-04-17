@@ -1,0 +1,24 @@
+flowchart TD
+    START([Method selected]) --> A{method == custom?}
+
+    A -- Yes --> HIGH1([high])
+    A -- No  --> B{method == clinicianCap?}
+
+    B -- Yes --> HIGH2([high\ncaution flags do not apply])
+    B -- No  --> C{isCautionMode?\nbetaBlocker OR heartCondition}
+
+    C -- Yes --> LOW([low])
+    C -- No  --> D{Anchor type?}
+
+    D -- measuredMaxHr\nor LTHR\nor clinicianCap --> HIGH3([high])
+    D -- age-estimated\nmaxHr --> MED([medium])
+
+    classDef high fill:#2E7D32,color:#fff,stroke:#1B5E20
+    classDef medium fill:#E65100,color:#fff,stroke:#BF360C
+    classDef low fill:#B71C1C,color:#fff,stroke:#7F0000
+    classDef decision fill:#FFF9C4,stroke:#F9A825,color:#333
+
+    class HIGH1,HIGH2,HIGH3 high
+    class MED medium
+    class LOW low
+    class A,B,C,D decision

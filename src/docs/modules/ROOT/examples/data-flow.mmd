@@ -1,0 +1,34 @@
+flowchart LR
+    %% Inputs
+    HP[/HealthProfile/]
+    HR[/List of HrReading\nbpm · elapsed/]
+
+    %% Zone calculation
+    HP --> CZ([calculateZones])
+    CZ --> ZC[(ZoneConfiguration\nzones · method\nreliability · maxHr · reason)]
+
+    %% Time-in-zone analysis
+    ZC --> TIZ([calculateTimeInZones])
+    HR --> TIZ
+    TIZ --> TZS[(TimeInZoneSummary\nzoneDurations\nmoderateOrHigherDuration\nrecoveryHrDrop)]
+
+    %% Edwards TRIMP
+    TZS --> ET([calculateEdwardsTrimp])
+    ET --> ED[/Edwards TRIMP\ndouble/]
+
+    %% Banister TRIMP
+    HR --> BT([calculateBanisterTrimp])
+    HP --> BT
+    BT --> BD[/Banister TRIMP\ndouble?/]
+
+    %% Real-time zone lookup
+    ZC --> CZF([currentZoneFromConfig\nbpm input])
+    CZF --> CZ2[/CalculatedZone?\nreal-time lookup/]
+
+    classDef fn fill:#1565C0,color:#fff,stroke:#0D47A1,rx:8
+    classDef store fill:#37474F,color:#fff,stroke:#263238
+    classDef io fill:#F5F5F5,color:#333,stroke:#9E9E9E
+
+    class CZ,TIZ,ET,BT,CZF fn
+    class ZC,TZS store
+    class HP,HR,ED,BD,CZ2 io

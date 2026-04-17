@@ -27,6 +27,8 @@ export 'src/health_profile.dart'
 export 'src/hr_reading.dart' show HrReading;
 export 'src/time_in_zone_calculator.dart'
     show ReadingCadence, TimeInZoneSummary, ZoneDuration, calculateTimeInZones;
+export 'src/training_load.dart'
+    show BanisterCoefficients, calculateBanisterTrimp, calculateEdwardsTrimp;
 export 'src/zone_calculator.dart'
     show
         CalculatedZone,

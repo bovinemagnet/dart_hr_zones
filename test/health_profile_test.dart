@@ -164,10 +164,32 @@ void main() {
       expect(MaxHrFormula.nes.apply(40), 185); // 211-25.6=185.4→185
     });
 
+    test('gellish2007.apply rounds correctly', () {
+      expect(MaxHrFormula.gellish2007.apply(30), 186); // 207-21=186
+      expect(MaxHrFormula.gellish2007.apply(40), 179); // 207-28=179
+      expect(MaxHrFormula.gellish2007.apply(49), 173); // 207-34.3=172.7→173
+    });
+
+    test('astrand.apply rounds correctly', () {
+      expect(MaxHrFormula.astrand.apply(30), 191); // 216.6-25.2=191.4→191
+      expect(MaxHrFormula.astrand.apply(40), 183); // 216.6-33.6=183.0→183
+      expect(MaxHrFormula.astrand.apply(49), 175); // 216.6-41.16=175.44→175
+    });
+
+    test('millerFaulkner.apply rounds correctly', () {
+      expect(MaxHrFormula.millerFaulkner.apply(30), 192); // 217-25.5=191.5→192
+      expect(MaxHrFormula.millerFaulkner.apply(40), 183); // 217-34=183
+      expect(
+          MaxHrFormula.millerFaulkner.apply(49), 175); // 217-41.65=175.35→175
+    });
+
     test('displayName is human readable', () {
       expect(MaxHrFormula.tanaka.displayName, contains('Tanaka'));
       expect(MaxHrFormula.fox220.displayName, contains('Fox'));
       expect(MaxHrFormula.nes.displayName, contains('Nes'));
+      expect(MaxHrFormula.gellish2007.displayName, contains('Gellish'));
+      expect(MaxHrFormula.astrand.displayName, contains('strand'));
+      expect(MaxHrFormula.millerFaulkner.displayName, contains('Miller'));
     });
   });
 

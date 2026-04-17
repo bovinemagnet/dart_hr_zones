@@ -1,0 +1,125 @@
+= Core Concepts
+Paul Snow
+:description: Heart rate zones, the five-zone model, the priority chain, and reliability grading explained.
+
+This page covers the foundational ideas behind `hr_zones`: what a heart rate zone is, how the five-zone model works, the anchor concept, how the library selects a calculation method, and how it grades the result.
+
+== Heart rate zones
+
+A heart rate zone is a range of beats per minute (bpm) associated with a particular exercise intensity.
+Training within different zones produces different physiological adaptations: zone 1 and 2 work builds aerobic base and fat oxidation efficiency; zone 3 and 4 work raises lactate threshold; zone 5 work targets maximal oxygen uptake.
+
+Zones are always relative — the same absolute bpm can be easy for a trained athlete and near-maximum for a sedentary adult.
+Every calculation method in this library derives zone boundaries from an *anchor value* that is personalised to the individual.
+
+== The five-zone model
+
+`hr_zones` uses a five-zone model throughout:
+
+[cols="1,2,2,2,2", options="header"]
+|===
+|Zone |Default label |Effort |Descriptor |Default % of max
+
+|1 |Zone 1 – Recovery |Easy |Recovery |50 – 60 %
+|2 |Zone 2 – Base Fitness |Light |Aerobic |60 – 70 %
+|3 |Zone 3 – Aerobic |Moderate |Aerobic |70 – 80 %
+|4 |Zone 4 – Lactate Threshold |Hard |Anaerobic |80 – 90 %
+|5 |Zone 5 – VO2 Max |Very Hard |VO2 Max |90 – 100 %
+|===
+
+Zone 5 has no upper bound (`upperBound` is `null`); it extends to the maximum heart rate.
+The default percentage bands and labels can all be overridden per call to `calculateZones`.
+See xref:methods.adoc[Calculation Methods] for details.
+
+== The anchor concept
+
+Each calculation method derives zone boundaries from a single *anchor value*.
+The anchor depends on the method:
+
+* *Max-HR-based methods* (clinician cap, HRR/Karvonen, percent of measured max, percent of estimated max) — the anchor is the maximum heart rate.
+  `ZoneConfiguration.maxHr` holds this value.
+* *LTHR method* — the anchor is the lactate threshold heart rate (LTHR).
+  `ZoneConfiguration.maxHr` holds the *LTHR value* for this method; the field name is intentionally reused as the general "anchor" field.
+
+`CalculatedZone.lowerPercent` and `upperPercent` are fractions of the anchor value.
+For custom zones they are always `0` because explicit BPM bounds make percentages inapplicable.
+
+== The priority chain
+
+`calculateZones` does not require you to choose a method.
+It walks a priority list and returns the first method that has sufficient data, always preferring the most reliable option available.
+
+The priority order is:
+
+[cols="1,2,2", options="header"]
+|===
+|Priority |Method |Required inputs
+
+|1 |Custom zones |`HealthProfile.customZones` set
+|2 |Clinician cap |`HealthProfile.clinicianMaxHr` set
+|3 |LTHR / Friel |`HealthProfile.lactateThresholdHr` set
+|4 |HRR / Karvonen |Max HR (measured or age-estimated) *and* `HealthProfile.restingHr`
+|5 |Percent of measured max |`HealthProfile.measuredMaxHr` set
+|6 |Percent of estimated max |`HealthProfile.age` set (uses `maxHrFormula`)
+|===
+
+`calculateZones` returns `null` only when none of the six methods has sufficient data — in practice this means no age, no measured max, no LTHR, and no custom zones were supplied.
+
+== Reliability grading
+
+The `ZoneReliability` enum signals how trustworthy the returned zones are.
+It is intended for display in tooltips, subtitles, and warnings — not for gating workout logic.
+
+[mermaid]
+....
+include::example$reliability-grading.mmd[]
+....
+
+The grading rules are:
+
+`high`:: Custom zones; clinician cap (always, even with caution flags); measured max HR without caution; Karvonen with measured max HR without caution; LTHR without caution.
+`medium`:: Estimated max HR without caution; Karvonen with estimated max HR without caution.
+`low`:: Any non-clinician-cap result when caution mode is active (beta-blocker or heart condition set).
+
+See xref:caution-mode.adoc[Caution Mode] for a full explanation of how caution flags interact with reliability and the clinician cap.
+
+== The reason string
+
+`ZoneConfiguration.reason` is a human-readable sentence explaining which method was used and why.
+It names any active caution flags and suggests a follow-up action when reliability is below `high`.
+Use it as tooltip or subtitle text in a UI.
+
+Example reason strings:
+
+[source,text]
+----
+"Using heart rate reserve (Karvonen) method with measured maximum heart rate."
+
+"Caution mode (beta blocker medication reported). Using percentage of estimated
+maximum heart rate (Tanaka). Consider setting a clinician-provided maximum
+heart rate."
+
+"Using clinician-prescribed maximum heart rate."
+----
+
+== CalculatedZone fields
+
+Each `CalculatedZone` in `ZoneConfiguration.zones` exposes:
+
+[cols="2,3", options="header"]
+|===
+|Field |Description
+
+|`zoneNumber` |Integer 1–5
+|`label` |Combined label, e.g. `"Zone 3 – Aerobic"`
+|`effortLabel` |Short descriptor, e.g. `"Moderate"`
+|`descriptiveLabel` |Physiological descriptor, e.g. `"Aerobic"`
+|`displayLabel` |Getter combining effort and physiological: `"Moderate (Aerobic)"`
+|`lowerBound` |Inclusive lower BPM bound
+|`upperBound` |Exclusive upper BPM bound; `null` for zone 5
+|`color` |Packed `0xAARRGGBB` integer
+|`lowerPercent` |Lower bound as a fraction of the anchor (0 for custom zones)
+|`upperPercent` |Upper bound as a fraction of the anchor (0 for custom zones)
+|===
+
+The `containsBpm(int bpm)` helper returns `true` if the given BPM falls within the zone bounds.

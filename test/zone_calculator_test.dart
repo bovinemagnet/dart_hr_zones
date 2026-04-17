@@ -283,6 +283,84 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // ZoneMethod.lthrFriel
+  // -------------------------------------------------------------------------
+  group('ZoneMethod.lthrFriel', () {
+    late ZoneConfiguration config;
+
+    setUp(() {
+      const profile = HealthProfile(lactateThresholdHr: 160);
+      config = calculateZones(profile)!;
+    });
+
+    test('method is lthrFriel', () {
+      expect(config.method, ZoneMethod.lthrFriel);
+    });
+
+    test('reliability is high', () {
+      expect(config.reliability, ZoneReliability.high);
+    });
+
+    test('maxHr holds the LTHR anchor value', () {
+      expect(config.maxHr, 160);
+    });
+
+    test('reason references Friel', () {
+      expect(config.reason, contains('Friel'));
+    });
+
+    test('zone 2 lower bound = 85% of LTHR = 136', () {
+      // 160 × 0.85 = 136
+      expect(config.zones[1].lowerBound, 136);
+    });
+
+    test('zone 5 lower bound = 100% of LTHR = 160', () {
+      expect(config.zones[4].lowerBound, 160);
+    });
+
+    test('zone 5 upperBound is null (open upper)', () {
+      expect(config.zones[4].upperBound, isNull);
+    });
+
+    test('lowerPercent/upperPercent are fractions of LTHR', () {
+      // Zone 2 band is 85–90 %.
+      expect(config.zones[1].lowerPercent, 0.85);
+      expect(config.zones[1].upperPercent, 0.90);
+    });
+  });
+
+  group('LTHR caution-mode and priority', () {
+    test('caution flag + LTHR → lthrFriel, low reliability', () {
+      const profile = HealthProfile(
+        lactateThresholdHr: 155,
+        betaBlocker: true,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.lthrFriel);
+      expect(config.reliability, ZoneReliability.low);
+      expect(config.reason, contains('Caution'));
+      expect(config.reason, contains('Friel'));
+    });
+
+    test('clinician cap beats LTHR', () {
+      const profile = HealthProfile(
+        clinicianMaxHr: 150,
+        lactateThresholdHr: 160,
+      );
+      expect(calculateZones(profile)!.method, ZoneMethod.clinicianCap);
+    });
+
+    test('LTHR beats Karvonen when both inputs are available', () {
+      const profile = HealthProfile(
+        measuredMaxHr: 190,
+        restingHr: 60,
+        lactateThresholdHr: 160,
+      );
+      expect(calculateZones(profile)!.method, ZoneMethod.lthrFriel);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Priority chain
   // -------------------------------------------------------------------------
   group('priority chain', () {
@@ -641,6 +719,43 @@ void main() {
       final config = calculateZones(profile)!;
       expect(config.maxHr, 192);
       expect(config.reason, contains('Nes'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Additional formulas (Gellish, Åstrand, Miller–Faulkner) through
+  // calculateZones
+  // -------------------------------------------------------------------------
+  group('Extra formulas through calculateZones', () {
+    test('age 40 with Gellish → max 179, reason references Gellish', () {
+      const profile = HealthProfile(
+        age: 40,
+        maxHrFormula: MaxHrFormula.gellish2007,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
+      expect(config.maxHr, 179);
+      expect(config.reason, contains('Gellish'));
+    });
+
+    test('age 40 with Åstrand → max 183, reason references Åstrand', () {
+      const profile = HealthProfile(
+        age: 40,
+        maxHrFormula: MaxHrFormula.astrand,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.maxHr, 183);
+      expect(config.reason, contains('strand'));
+    });
+
+    test('age 40 with Miller–Faulkner → max 183, reason mentions Miller', () {
+      const profile = HealthProfile(
+        age: 40,
+        maxHrFormula: MaxHrFormula.millerFaulkner,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.maxHr, 183);
+      expect(config.reason, contains('Miller'));
     });
   });
 

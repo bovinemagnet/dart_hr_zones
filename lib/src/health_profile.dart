@@ -10,6 +10,10 @@
 ///
 /// [nes] (Nes et al., 2013) is `211 − 0.64 × age`, derived from a large
 /// Norwegian cross-sectional study and slightly more accurate for fit adults.
+///
+/// [gellish2007], [astrand], and [millerFaulkner] are additional published
+/// alternatives covering different cohorts; see each value's doc comment for
+/// the citation.
 enum MaxHrFormula {
   /// Tanaka 2001: `208 − 0.7 × age`. Modern default.
   tanaka,
@@ -20,6 +24,18 @@ enum MaxHrFormula {
 
   /// Nes et al. 2013: `211 − 0.64 × age`. Large Norwegian sample.
   nes,
+
+  /// Gellish et al. 2007: `207 − 0.7 × age`. Linear form derived from 908
+  /// healthy adults across a wide age range.
+  gellish2007,
+
+  /// Åstrand 1952: `216.6 − 0.84 × age`. Classical formula with a steeper
+  /// age-related decline than Tanaka.
+  astrand,
+
+  /// Miller, Wallace & Eggert 1993: `217 − 0.85 × age`. Derived from a
+  /// meta-analytic adjustment of earlier Fox-style estimates.
+  millerFaulkner,
 }
 
 /// Extension exposing the numeric evaluation of each [MaxHrFormula].
@@ -33,6 +49,12 @@ extension MaxHrFormulaApply on MaxHrFormula {
         return 220 - age;
       case MaxHrFormula.nes:
         return (211 - 0.64 * age).round();
+      case MaxHrFormula.gellish2007:
+        return (207 - 0.7 * age).round();
+      case MaxHrFormula.astrand:
+        return (216.6 - 0.84 * age).round();
+      case MaxHrFormula.millerFaulkner:
+        return (217 - 0.85 * age).round();
     }
   }
 
@@ -45,6 +67,12 @@ extension MaxHrFormulaApply on MaxHrFormula {
         return 'Fox (220 \u2212 age)';
       case MaxHrFormula.nes:
         return 'Nes (211 \u2212 0.64 \u00d7 age)';
+      case MaxHrFormula.gellish2007:
+        return 'Gellish (207 \u2212 0.7 \u00d7 age)';
+      case MaxHrFormula.astrand:
+        return '\u00c5strand (216.6 \u2212 0.84 \u00d7 age)';
+      case MaxHrFormula.millerFaulkner:
+        return 'Miller\u2013Faulkner (217 \u2212 0.85 \u00d7 age)';
     }
   }
 }
@@ -153,6 +181,15 @@ class HealthProfile {
   /// The user's measured maximum heart rate (e.g. from a lab or field test).
   final int? measuredMaxHr;
 
+  /// Measured lactate threshold heart rate in beats per minute.
+  ///
+  /// Typically obtained from a 30-minute time-trial protocol (Friel) or a
+  /// lab lactate test. When set, the LTHR / Friel method is attempted in the
+  /// priority chain after [clinicianMaxHr] but before HRR/Karvonen — LTHR is
+  /// a measured threshold value and, when available, is a stronger anchor
+  /// than the HRR fallback.
+  final int? lactateThresholdHr;
+
   /// Whether the user takes beta-blockers, which suppress heart rate.
   ///
   /// When `true` and no [clinicianMaxHr] is set, reliability is downgraded to
@@ -183,6 +220,7 @@ class HealthProfile {
     this.restingHr,
     this.clinicianMaxHr,
     this.measuredMaxHr,
+    this.lactateThresholdHr,
     this.betaBlocker = false,
     this.heartCondition = false,
     this.customZones,
@@ -211,6 +249,8 @@ class HealthProfile {
     bool clearClinicianMaxHr = false,
     int? measuredMaxHr,
     bool clearMeasuredMaxHr = false,
+    int? lactateThresholdHr,
+    bool clearLactateThresholdHr = false,
     bool? betaBlocker,
     bool? heartCondition,
     CustomZoneBoundary? customZones,
@@ -224,6 +264,9 @@ class HealthProfile {
           clearClinicianMaxHr ? null : (clinicianMaxHr ?? this.clinicianMaxHr),
       measuredMaxHr:
           clearMeasuredMaxHr ? null : (measuredMaxHr ?? this.measuredMaxHr),
+      lactateThresholdHr: clearLactateThresholdHr
+          ? null
+          : (lactateThresholdHr ?? this.lactateThresholdHr),
       betaBlocker: betaBlocker ?? this.betaBlocker,
       heartCondition: heartCondition ?? this.heartCondition,
       customZones: clearCustomZones ? null : (customZones ?? this.customZones),
@@ -234,7 +277,9 @@ class HealthProfile {
   @override
   String toString() => 'HealthProfile('
       'age: $age, restingHr: $restingHr, measuredMaxHr: $measuredMaxHr, '
-      'clinicianMaxHr: $clinicianMaxHr, betaBlocker: $betaBlocker, '
+      'clinicianMaxHr: $clinicianMaxHr, '
+      'lactateThresholdHr: $lactateThresholdHr, '
+      'betaBlocker: $betaBlocker, '
       'heartCondition: $heartCondition, customZones: $customZones, '
       'maxHrFormula: $maxHrFormula)';
 }

@@ -1,0 +1,187 @@
+= Time in Zone
+Paul Snow
+:description: Accumulating per-zone durations from heart rate readings, and computing cooldown-gated recovery HR drop.
+
+`hr_zones` can accumulate the time an athlete spent in each heart rate zone from a sequence of timestamped heart rate readings.
+The result feeds directly into xref:training-load.adoc[training-load calculations].
+
+== Data flow
+
+[mermaid]
+....
+include::example$data-flow.mmd[]
+....
+
+== HrReading
+
+`HrReading` is the input unit for time-in-zone analysis.
+Each reading holds a heart rate in bpm and an elapsed time since the start of the activity:
+
+[source,dart]
+----
+const reading = HrReading(bpm: 145, elapsed: Duration(minutes: 12));
+----
+
+[cols="2,3", options="header"]
+|===
+|Field |Description
+
+|`bpm` |Heart rate in beats per minute
+|`elapsed` |Time since the start of the activity (e.g. from a GPS watch or sensor stream)
+|===
+
+`HrReading` is a value type — it implements equality and `toString`.
+
+== calculateTimeInZones
+
+[source,dart]
+----
+TimeInZoneSummary calculateTimeInZones(
+  List<HrReading> readings,
+  ZoneConfiguration config, {
+  Duration cooldownGap = ReadingCadence.cooldownGap,
+})
+----
+
+Pass a list of `HrReading` values ordered by `elapsed` time, together with a `ZoneConfiguration` from `calculateZones`.
+The function returns a `TimeInZoneSummary`.
+
+=== Attribution rule
+
+The *earlier* reading's bpm determines the zone for each interval.
+For an interval between reading `i` and reading `i+1`, the zone is decided by reading `i`'s bpm.
+
+This rule is consistent with the treatment in xref:training-load.adoc#banister-trimp[Banister TRIMP].
+
+=== Dropped intervals
+
+Intervals with a non-positive time delta (`elapsed[i+1] <= elapsed[i]`) are silently dropped.
+This handles duplicate timestamps and out-of-order readings.
+
+=== Below-zone readings
+
+Readings whose bpm falls below zone 1's lower bound contribute no zone time.
+They are counted toward elapsed time for the purpose of gap detection, but not attributed to any zone.
+
+=== Example
+
+[source,dart]
+----
+final readings = [
+  HrReading(bpm: 95,  elapsed: Duration.zero),
+  HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
+  HrReading(bpm: 155, elapsed: Duration(minutes: 10)),
+  // Recovery sample: at least 55 s after the last active reading
+  HrReading(bpm: 110, elapsed: Duration(minutes: 11)),
+];
+
+final config = calculateZones(HealthProfile(age: 40))!;
+final summary = calculateTimeInZones(readings, config);
+
+print('Moderate or higher: ${summary.moderateOrHigherDuration.inMinutes} min');
+print('Recovery HR drop:   ${summary.recoveryHrDrop} bpm');
+
+for (final zd in summary.zoneDurations) {
+  final mins = zd.duration.inSeconds / 60;
+  print('Zone ${zd.zone.zoneNumber}: ${mins.toStringAsFixed(1)} min');
+}
+----
+
+== TimeInZoneSummary
+
+`TimeInZoneSummary` is the return type of `calculateTimeInZones`:
+
+[cols="2,3", options="header"]
+|===
+|Field / method |Description
+
+|`zoneDurations` |`List<ZoneDuration>` — one entry per zone, in zone-number order
+|`moderateOrHigherDuration` |Total `Duration` spent in zones 3, 4, and 5
+|`recoveryHrDrop` |Optional `int` — recovery HR drop in bpm (see below)
+|`durationInZone(int zoneNumber)` |Helper returning the `Duration` for a specific zone number
+|===
+
+== ZoneDuration
+
+Each `ZoneDuration` in `TimeInZoneSummary.zoneDurations` pairs a `CalculatedZone` with a `Duration`:
+
+[source,dart]
+----
+for (final zd in summary.zoneDurations) {
+  print('${zd.zone.displayLabel}: ${zd.duration.inSeconds} s');
+}
+----
+
+== Cooldown-gated recovery HR drop
+
+`recoveryHrDrop` represents the drop in heart rate during a recovery period after exercise.
+It is computed as `peakBpm − lastBpm`, where `lastBpm` is the bpm of the final reading.
+
+The key constraint: `recoveryHrDrop` is populated *only* when the final interval — the gap between the penultimate and last readings — is at least `cooldownGap` (default 55 seconds, from `ReadingCadence.cooldownGap`).
+
+=== Why cooldown gating exists
+
+During active monitoring (e.g. a sensor sending a reading every second), consecutive intervals are very short.
+Without gating, a momentary dip in HR at any point in the session would incorrectly populate `recoveryHrDrop`.
+The 55-second threshold ensures the value is only set when there is clear evidence of a genuine recovery phase — a deliberate cool-down reading taken at least 55 seconds after the last active sample.
+
+When the condition is not met, `recoveryHrDrop` is `null`.
+UIs should display the field only when it is non-null.
+
+[source,dart]
+----
+// Final gap is 60 s — recovery drop is populated.
+final readings = [
+  HrReading(bpm: 95,  elapsed: Duration.zero),
+  HrReading(bpm: 155, elapsed: Duration(minutes: 10)),
+  HrReading(bpm: 100, elapsed: Duration(minutes: 11)),  // 60 s gap
+];
+final summary = calculateTimeInZones(readings, config);
+print(summary.recoveryHrDrop); // 55 (155 - 100)
+
+// Final gap is 5 s — recovery drop is null.
+final readings2 = [
+  HrReading(bpm: 95,  elapsed: Duration.zero),
+  HrReading(bpm: 155, elapsed: Duration(minutes: 10, seconds: 55)),
+  HrReading(bpm: 150, elapsed: Duration(minutes: 11, seconds: 0)),  // 5 s gap
+];
+final summary2 = calculateTimeInZones(readings2, config);
+print(summary2.recoveryHrDrop); // null
+----
+
+=== Custom cooldown gap
+
+Override `cooldownGap` to suit your data cadence:
+
+[source,dart]
+----
+final summary = calculateTimeInZones(
+  readings,
+  config,
+  cooldownGap: const Duration(seconds: 30),
+);
+----
+
+`ReadingCadence.cooldownGap` is `const Duration(seconds: 55)`.
+
+== Using durationInZone
+
+`durationInZone` is a convenience helper on `TimeInZoneSummary`:
+
+[source,dart]
+----
+final zone3Duration = summary.durationInZone(3);
+print('Zone 3 time: ${zone3Duration.inMinutes} min');
+----
+
+== Passing results to training load
+
+`TimeInZoneSummary` feeds directly into the training-load functions:
+
+[source,dart]
+----
+final edwards = calculateEdwardsTrimp(summary);
+print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
+----
+
+See xref:training-load.adoc[Training Load (TRIMP)] for full details.

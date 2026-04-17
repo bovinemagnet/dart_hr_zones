@@ -1,0 +1,227 @@
+= API Reference
+Paul Snow
+:description: Compact symbol reference for the hr_zones public API. All symbols are exported from package:hr_zones/hr_zones.dart.
+
+All public symbols are exported from a single import:
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+----
+
+For full dartdoc — parameter types, return types, and detailed documentation — see the https://pub.dev/documentation/hr_zones/latest/[generated API reference on pub.dev].
+This page is a quick-reference index, not a replacement for dartdoc.
+
+== Functions
+
+[cols="3,4", options="header"]
+|===
+|Signature |Description
+
+|`calculateZones(HealthProfile profile, {List<(double, double)>? bands, List<String>? labels, List<String>? effortLabels, List<String>? descriptiveLabels, List<int>? colors}) → ZoneConfiguration?`
+|Calculates zones using the priority chain. Returns `null` only when no method has sufficient data. All list overrides must have exactly five elements.
+
+|`currentZoneFromConfig(int bpm, ZoneConfiguration config) → CalculatedZone?`
+|Returns the zone that contains `bpm`, or `null` if `bpm` is below zone 1's lower bound. Used for real-time zone display.
+
+|`calculateTimeInZones(List<HrReading> readings, ZoneConfiguration config, {Duration cooldownGap}) → TimeInZoneSummary`
+|Accumulates per-zone durations from an ordered list of readings. Earlier reading's bpm governs each interval. Non-positive intervals are dropped. Default `cooldownGap` is `ReadingCadence.cooldownGap` (55 s).
+
+|`calculateEdwardsTrimp(TimeInZoneSummary summary) → double`
+|Zone-weighted training load: `1 × z1 + 2 × z2 + ... + 5 × z5` (minutes). Never returns `null`.
+
+|`calculateBanisterTrimp(List<HrReading> readings, HealthProfile profile, {BanisterCoefficients coefficients}) → double?`
+|HRR-weighted exponential training load. Returns `null` when `restingHr` or a max HR is missing. Defaults to `BanisterCoefficients.male()`.
+|===
+
+== Classes
+
+=== HealthProfile
+
+Input model. All fields are optional — supply as many as are known.
+
+[cols="2,1,3", options="header"]
+|===
+|Field |Type |Description
+
+|`age` |`int?` |Age in years. Drives `estimatedMaxHr`.
+|`restingHr` |`int?` |Resting HR in bpm. Required for Karvonen.
+|`measuredMaxHr` |`int?` |Lab- or field-tested maximum HR.
+|`clinicianMaxHr` |`int?` |Prescriber-specified cap. Authoritative; overrides caution.
+|`lactateThresholdHr` |`int?` |Measured LTHR for the Friel method.
+|`betaBlocker` |`bool` |Beta-blocker flag. Activates caution mode.
+|`heartCondition` |`bool` |Heart-condition flag. Activates caution mode.
+|`customZones` |`CustomZoneBoundary?` |Explicit BPM lower bounds for all five zones.
+|`maxHrFormula` |`MaxHrFormula` |Formula for age-based estimate. Default: `tanaka`.
+|===
+
+Getters: `isCautionMode`, `estimatedMaxHr`.
+
+Method: `copyWith({...clear... flags})` — pass `clear*: true` to reset a field to `null`.
+
+=== CustomZoneBoundary
+
+Explicit zone lower bounds, with optional per-zone labels.
+
+[cols="2,1,3", options="header"]
+|===
+|Field |Type |Description
+
+|`zone1Lower` |`int` |Inclusive lower bound of zone 1 in bpm.
+|`zone2Lower` |`int` |Inclusive lower bound of zone 2 in bpm.
+|`zone3Lower` |`int` |Inclusive lower bound of zone 3 in bpm.
+|`zone4Lower` |`int` |Inclusive lower bound of zone 4 in bpm.
+|`zone5Lower` |`int` |Inclusive lower bound of zone 5 in bpm.
+|`labels` |`List<String>?` |Optional five-element list of effort label strings.
+|===
+
+=== ZoneConfiguration
+
+Result of `calculateZones`.
+
+[cols="2,1,3", options="header"]
+|===
+|Field |Type |Description
+
+|`zones` |`List<CalculatedZone>` |Five zones in order (zone 1 to 5).
+|`method` |`ZoneMethod` |The method that was used.
+|`reliability` |`ZoneReliability` |Quality grade of the result.
+|`maxHr` |`int` |Anchor value: max HR for most methods; LTHR for `lthrFriel`.
+|`reason` |`String` |Human-readable explanation for tooltips or subtitles.
+|===
+
+=== CalculatedZone
+
+One zone within a `ZoneConfiguration`.
+
+[cols="2,1,3", options="header"]
+|===
+|Field / getter |Type |Description
+
+|`zoneNumber` |`int` |Zone number (1–5).
+|`label` |`String` |Combined label, e.g. `"Zone 3 – Aerobic"`.
+|`effortLabel` |`String` |Short descriptor, e.g. `"Moderate"`.
+|`descriptiveLabel` |`String` |Physiological descriptor, e.g. `"Aerobic"`.
+|`displayLabel` |`String` |`"effortLabel (descriptiveLabel)"`, e.g. `"Moderate (Aerobic)"`.
+|`lowerBound` |`int` |Inclusive lower BPM bound.
+|`upperBound` |`int?` |Exclusive upper BPM bound; `null` for zone 5.
+|`color` |`int` |Packed `0xAARRGGBB` integer.
+|`lowerPercent` |`double` |Lower bound fraction of anchor (0 for custom zones).
+|`upperPercent` |`double` |Upper bound fraction of anchor (0 for custom zones).
+|`containsBpm(int)` |`bool` |Returns `true` if bpm falls within this zone's bounds.
+|===
+
+=== HrReading
+
+A timestamped heart rate measurement.
+
+[cols="2,1,3", options="header"]
+|===
+|Field |Type |Description
+
+|`bpm` |`int` |Heart rate in beats per minute.
+|`elapsed` |`Duration` |Time since the start of the activity.
+|===
+
+Value type: implements `==` and `hashCode`; has `toString`.
+
+=== TimeInZoneSummary
+
+Result of `calculateTimeInZones`.
+
+[cols="2,1,3", options="header"]
+|===
+|Field / method |Type |Description
+
+|`zoneDurations` |`List<ZoneDuration>` |Per-zone durations (five entries).
+|`moderateOrHigherDuration` |`Duration` |Total time in zones 3–5.
+|`recoveryHrDrop` |`int?` |`peakBpm − lastBpm` when final gap >= `cooldownGap`; else `null`.
+|`durationInZone(int zoneNumber)` |`Duration` |Time in the specified zone.
+|===
+
+=== ZoneDuration
+
+[cols="2,1,3", options="header"]
+|===
+|Field |Type |Description
+
+|`zone` |`CalculatedZone` |The zone.
+|`duration` |`Duration` |Time spent in this zone.
+|===
+
+=== ReadingCadence
+
+Utility class exposing the default cooldown gap constant.
+
+|`cooldownGap` | `const Duration(seconds: 55)` | Default gap required for `recoveryHrDrop` to be populated.
+
+=== BanisterCoefficients
+
+Holds the `a` and `b` weighting pair for Banister TRIMP.
+
+[cols="2,1,3", options="header"]
+|===
+|Constructor / field |Type |Description
+
+|`BanisterCoefficients.male()` |— |`a = 0.64`, `b = 1.92`.
+|`BanisterCoefficients.female()` |— |`a = 0.86`, `b = 1.67`.
+|`BanisterCoefficients({a, b})` |— |Custom pair for cohort-specific weighting.
+|`a` |`double` |Intensity factor.
+|`b` |`double` |Steepness factor.
+|===
+
+== Enums
+
+=== ZoneMethod
+
+[cols="2,3", options="header"]
+|===
+|Value |Description
+
+|`custom` |Explicit BPM lower bounds via `CustomZoneBoundary`.
+|`clinicianCap` |Percentage of clinician-prescribed max HR.
+|`lthrFriel` |Friel five-zone bands anchored on LTHR.
+|`hrrKarvonen` |Heart rate reserve (Karvonen) method.
+|`percentOfMeasuredMax` |Percentage of measured max HR.
+|`percentOfEstimatedMax` |Percentage of age-estimated max HR.
+|===
+
+=== ZoneReliability
+
+[cols="2,3", options="header"]
+|===
+|Value |Description
+
+|`high` |Custom, clinician cap, or measured data without caution flags.
+|`medium` |Age-estimated max without caution flags.
+|`low` |Any non-clinician-cap method with caution mode active.
+|===
+
+=== MaxHrFormula
+
+[cols="2,2,3", options="header"]
+|===
+|Value |Expression |Citation
+
+|`tanaka` (default) |`208 − 0.7 × age` |Tanaka, Monahan & Seals, 2001
+|`fox220` |`220 − age` |Fox, Naughton & Haskell, 1971
+|`nes` |`211 − 0.64 × age` |Nes et al., 2013
+|`gellish2007` |`207 − 0.7 × age` |Gellish et al., 2007
+|`astrand` |`216.6 − 0.84 × age` |Åstrand, 1952
+|`millerFaulkner` |`217 − 0.85 × age` |Miller, Wallace & Eggert, 1993
+|===
+
+Extension `MaxHrFormulaApply` adds `.apply(int age) → int` and `.displayName → String` to the enum.
+
+== Default zone colours
+
+[cols="1,2,2", options="header"]
+|===
+|Zone |Default colour (0xAARRGGBB) |Swatch
+
+|1 |`0xFF4FC3F7` |Light blue
+|2 |`0xFF81C784` |Light green
+|3 |`0xFFFFD54F` |Amber
+|4 |`0xFFFF8A65` |Deep orange
+|5 |`0xFFE57373` |Red
+|===

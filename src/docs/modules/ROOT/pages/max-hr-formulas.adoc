@@ -1,0 +1,132 @@
+= Max HR Formulas
+Paul Snow
+:description: All six age-based maximum heart rate formulas supported by hr_zones, with citations and sample calculations.
+
+When no measured maximum heart rate is available, `hr_zones` estimates it from age using one of six published formulas.
+The formula is selected via `HealthProfile.maxHrFormula`; the default is `tanaka`.
+
+== Supported formulas
+
+[cols="2,3,3,3", options="header"]
+|===
+|Enum value |Expression |Citation |Notes
+
+|`tanaka` (default)
+|`208 − 0.7 × age`
+|Tanaka, Monahan & Seals, 2001
+|Derived from a meta-analysis of 351 studies. Modern consensus formula. More accurate than Fox 220 for adults over 40.
+
+|`fox220`
+|`220 − age`
+|Fox, Naughton & Haskell, 1971
+|Legacy formula; widely taught. Tends to overestimate for younger adults and underestimate for older adults. Keep for compatibility with existing tooling.
+
+|`nes`
+|`211 − 0.64 × age`
+|Nes et al., 2013
+|Derived from a large Norwegian cross-sectional cohort. Slightly more accurate for fit adults; gentler age-related decline than Fox.
+
+|`gellish2007`
+|`207 − 0.7 × age`
+|Gellish et al., 2007
+|Linear form derived from 908 healthy adults across a wide age range. Very similar to Tanaka; the intercept differs by 1 bpm.
+
+|`astrand`
+|`216.6 − 0.84 × age`
+|Åstrand, 1952
+|Classical formula. Steeper age-related decline than Tanaka; tends to produce higher estimates for young adults and lower for older adults.
+
+|`millerFaulkner`
+|`217 − 0.85 × age`
+|Miller, Wallace & Eggert, 1993
+|Meta-analytic adjustment of Fox-style estimates. Similar slope to Åstrand; 0.4 bpm higher intercept.
+
+|===
+
+== Sample calculations
+
+The table below shows the estimated max HR for ages 30, 40, and 49.
+Values are rounded to the nearest whole number as `MaxHrFormula.apply(age)` returns an `int`.
+
+[cols="2,1,1,1", options="header"]
+|===
+|Formula |Age 30 |Age 40 |Age 49
+
+|`tanaka`  |187 |180 |174
+|`fox220`  |190 |180 |171
+|`nes`     |192 |185 |180
+|`gellish2007` |186 |179 |173
+|`astrand` |192 |183 |176
+|`millerFaulkner` |191 |183 |175
+|===
+
+NOTE: At age 40, `tanaka` and `fox220` give the same result (180 bpm) because their lines cross near that age.
+For younger adults `fox220` is higher; for older adults it drops faster.
+
+== Selecting a formula
+
+Pass `maxHrFormula` when constructing a `HealthProfile`:
+
+[source,dart]
+----
+// Default — Tanaka
+final profile = HealthProfile(age: 40);
+print(profile.estimatedMaxHr); // 180
+
+// Fox 220 for legacy compatibility
+final profileFox = HealthProfile(
+  age: 40,
+  maxHrFormula: MaxHrFormula.fox220,
+);
+print(profileFox.estimatedMaxHr); // 180
+
+// Nes for fit adults
+final profileNes = HealthProfile(
+  age: 40,
+  maxHrFormula: MaxHrFormula.nes,
+);
+print(profileNes.estimatedMaxHr); // 185
+----
+
+== Direct numeric evaluation
+
+You can evaluate any formula directly without a `HealthProfile`:
+
+[source,dart]
+----
+MaxHrFormula.tanaka.apply(30);         // 187
+MaxHrFormula.fox220.apply(30);         // 190
+MaxHrFormula.nes.apply(30);            // 192
+MaxHrFormula.gellish2007.apply(30);    // 186
+MaxHrFormula.astrand.apply(30);        // 192
+MaxHrFormula.millerFaulkner.apply(30); // 191
+----
+
+The `displayName` getter returns a human-readable string suitable for UI labels:
+
+[source,dart]
+----
+MaxHrFormula.tanaka.displayName;
+// "Tanaka (208 − 0.7 × age)"
+
+MaxHrFormula.fox220.displayName;
+// "Fox (220 − age)"
+
+MaxHrFormula.nes.displayName;
+// "Nes (211 − 0.64 × age)"
+----
+
+== Choosing the right formula
+
+For most general-purpose applications, use the default `tanaka`.
+It is the modern consensus and performs well across a broad adult population.
+
+Use `fox220` only when you need to match output from a legacy system or educational context that uses `220 − age`.
+
+Use `nes` for cohorts of fit adults (recreational athletes and above) where the gentler age-related decline may be more appropriate.
+
+Use `gellish2007`, `astrand`, or `millerFaulkner` when your application targets a specific research context that derived its reference ranges from one of those formulas, or when you are validating against a published study that used them.
+
+IMPORTANT: All age-based formulas carry inherent uncertainty — individual max HRs can deviate by ±10–15 bpm from any formula prediction.
+Where accuracy matters (clinical or competitive contexts), use a measured max HR or a clinician-prescribed cap instead.
+See xref:methods.adoc#clinician-cap[Clinician cap] and xref:methods.adoc#percent-of-measured-max[Percent of measured max].

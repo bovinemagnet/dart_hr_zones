@@ -1,0 +1,124 @@
+= Getting Started
+Paul Snow
+:description: Install hr_zones and run your first heart rate zone calculation.
+
+This page walks you through adding `hr_zones` to a Dart project and running your first zone calculation.
+
+== Prerequisites
+
+* Dart SDK 3.4.0 or later
+* A Dart or Flutter project with a `pubspec.yaml`
+
+== Installation
+
+Add the dependency using the Dart CLI:
+
+[source,bash]
+----
+dart pub add hr_zones
+----
+
+Or add it manually to `pubspec.yaml` and run `dart pub get`:
+
+[source,yaml]
+----
+dependencies:
+  hr_zones: ^0.0.2
+----
+
+[source,bash]
+----
+dart pub get
+----
+
+== Your first calculation
+
+Import the package — a single import gives you the complete public API:
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+----
+
+Create a `HealthProfile` with the data you have and call `calculateZones`:
+
+[source,dart]
+----
+void main() {
+  // Minimum viable profile: age only.
+  // The package will use the Tanaka formula to estimate max HR
+  // and return zones as percentages of that estimate.
+  final profile = HealthProfile(age: 35);
+  final config = calculateZones(profile);
+
+  if (config == null) {
+    print('Insufficient data to calculate zones.');
+    return;
+  }
+
+  print('Method:      ${config.method.name}');        // percentOfEstimatedMax
+  print('Reliability: ${config.reliability.name}');   // medium
+  print('Max HR used: ${config.maxHr} bpm');
+  print('Reason:      ${config.reason}');
+
+  for (final zone in config.zones) {
+    final upper = zone.upperBound?.toString() ?? 'max';
+    print('${zone.displayLabel}: ${zone.lowerBound}–$upper bpm');
+  }
+}
+----
+
+Expected output (age 35, Tanaka formula estimates max HR as 184 bpm):
+
+[source,text]
+----
+Method:      percentOfEstimatedMax
+Reliability: medium
+Max HR used: 184 bpm
+Reason:      Using percentage of estimated maximum heart rate (Tanaka).
+Zone 1 – Recovery (Easy): 92–110 bpm
+Zone 2 – Base Fitness (Light): 110–129 bpm
+Zone 3 – Aerobic (Moderate): 129–147 bpm
+Zone 4 – Lactate Threshold (Hard): 147–166 bpm
+Zone 5 – VO2 Max (Very Hard): 166–max bpm
+----
+
+NOTE: `calculateZones` returns `null` only when no method in the priority chain has sufficient data. With age alone it always succeeds by falling back to the age-estimated max.
+
+== Adding a resting heart rate
+
+Supplying `restingHr` unlocks the HRR/Karvonen method, which scales zones relative to your usable heart rate range and is considered more accurate for fit athletes with a low resting HR:
+
+[source,dart]
+----
+final profile = HealthProfile(age: 35, restingHr: 58);
+final config = calculateZones(profile)!;
+
+print('Method: ${config.method.name}');   // hrrKarvonen
+print('Reliability: ${config.reliability.name}'); // medium (age-estimated max)
+----
+
+== Supplying a measured max HR
+
+If you have a measured maximum heart rate (from a lab or field test), pass it via `measuredMaxHr`.
+The package will use Karvonen if `restingHr` is also set, or fall back to percent-of-measured-max.
+Either way the reliability rises to `high`:
+
+[source,dart]
+----
+final profile = HealthProfile(
+  measuredMaxHr: 188,
+  restingHr: 58,
+);
+final config = calculateZones(profile)!;
+
+print('Method: ${config.method.name}');       // hrrKarvonen
+print('Reliability: ${config.reliability.name}'); // high
+----
+
+== What to read next
+
+* xref:concepts.adoc[Core Concepts] — understand how the priority chain and reliability grading work.
+* xref:methods.adoc[Calculation Methods] — choose the right method for your use case.
+* xref:caution-mode.adoc[Caution Mode] — handling beta-blocker and heart-condition flags safely.
+* xref:examples.adoc[Examples] — end-to-end worked walkthroughs.

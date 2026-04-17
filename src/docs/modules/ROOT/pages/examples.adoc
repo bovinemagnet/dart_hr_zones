@@ -1,0 +1,245 @@
+= Examples
+Paul Snow
+:description: End-to-end worked examples for hr_zones: recreational runner, trained athlete with LTHR and TRIMP, and a post-MI patient with clinician cap.
+
+These walkthroughs show complete, runnable code for three typical use cases.
+Each example is self-contained and imports only `package:hr_zones/hr_zones.dart`.
+
+== Example 1: recreational runner (age only)
+
+=== Scenario
+
+A 35-year-old recreational runner has no recent lab data — only their age.
+They want to understand their heart rate zones for a base-building programme.
+
+=== Code
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+
+void main() {
+  final profile = HealthProfile(age: 35);
+  final config = calculateZones(profile);
+
+  if (config == null) {
+    print('Cannot calculate zones: insufficient data.');
+    return;
+  }
+
+  print('Method:      ${config.method.name}');
+  print('Reliability: ${config.reliability.name}');
+  print('Max HR:      ${config.maxHr} bpm');
+  print('Reason:      ${config.reason}');
+  print('');
+
+  for (final zone in config.zones) {
+    final upper = zone.upperBound?.toString() ?? 'max';
+    print('${zone.label}: ${zone.lowerBound}–$upper bpm  '
+          '[${zone.effortLabel}]');
+  }
+}
+----
+
+=== Expected output
+
+[source,text]
+----
+Method:      percentOfEstimatedMax
+Reliability: medium
+Max HR:      184 bpm
+Reason:      Using percentage of estimated maximum heart rate (Tanaka).
+
+Zone 1 – Recovery: 92–110 bpm  [Easy]
+Zone 2 – Base Fitness: 110–129 bpm  [Light]
+Zone 3 – Aerobic: 129–147 bpm  [Moderate]
+Zone 4 – Lactate Threshold: 147–166 bpm  [Hard]
+Zone 5 – VO2 Max: 166–max bpm  [Very Hard]
+----
+
+=== Notes
+
+* The `medium` reliability signals that the zones are based on an estimate.
+  The runner should aim to obtain a measured max HR or resting HR to improve accuracy.
+* With `age: 35` and the default Tanaka formula, estimated max HR = `208 − 0.7 × 35 = 183.5 → 184 bpm`.
+* To display a reliability indicator in a UI, check `config.reliability` and show `config.reason` as a subtitle.
+
+== Example 2: trained athlete with LTHR and TRIMP analysis
+
+=== Scenario
+
+A 38-year-old trained cyclist has recently completed a 30-minute time-trial test and obtained an LTHR of 168 bpm.
+Their resting HR is 48 bpm.
+They want zone boundaries and a training-load score for a 45-minute threshold interval session.
+
+=== Code
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+
+void main() {
+  final profile = HealthProfile(
+    age: 38,
+    restingHr: 48,
+    lactateThresholdHr: 168,
+  );
+
+  final config = calculateZones(profile)!;
+
+  print('Method:      ${config.method.name}');   // lthrFriel
+  print('Reliability: ${config.reliability.name}');
+  print('LTHR anchor: ${config.maxHr} bpm');
+  print('');
+
+  for (final zone in config.zones) {
+    final upper = zone.upperBound?.toString() ?? 'max';
+    print('Zone ${zone.zoneNumber} (${zone.descriptiveLabel}): '
+          '${zone.lowerBound}–$upper bpm');
+  }
+
+  // Simulate a 45-minute session: warm-up, threshold blocks, cool-down.
+  final readings = [
+    HrReading(bpm: 120, elapsed: Duration.zero),
+    HrReading(bpm: 138, elapsed: Duration(minutes: 10)),   // zone 2
+    HrReading(bpm: 162, elapsed: Duration(minutes: 15)),   // zone 4
+    HrReading(bpm: 168, elapsed: Duration(minutes: 30)),   // zone 5
+    HrReading(bpm: 155, elapsed: Duration(minutes: 40)),   // zone 4
+    HrReading(bpm: 130, elapsed: Duration(minutes: 45)),   // zone 2
+    // Recovery reading taken 60 s after end of session.
+    HrReading(bpm: 98,  elapsed: Duration(minutes: 46)),
+  ];
+
+  final summary = calculateTimeInZones(readings, config);
+
+  print('');
+  print('Time in zone:');
+  for (final zd in summary.zoneDurations) {
+    final mins = (zd.duration.inSeconds / 60).toStringAsFixed(1);
+    print('  Zone ${zd.zone.zoneNumber}: $mins min');
+  }
+
+  print('Moderate or higher: '
+        '${summary.moderateOrHigherDuration.inMinutes} min');
+
+  if (summary.recoveryHrDrop != null) {
+    print('Recovery HR drop:   ${summary.recoveryHrDrop} bpm');
+  }
+
+  // Training load
+  final edwards = calculateEdwardsTrimp(summary);
+  final banister = calculateBanisterTrimp(readings, profile);
+
+  print('');
+  print('Edwards TRIMP:  ${edwards.toStringAsFixed(1)}');
+  print('Banister TRIMP: ${banister?.toStringAsFixed(2) ?? "n/a"}');
+}
+----
+
+=== Notes
+
+* `config.maxHr` holds the LTHR value (168) for the `lthrFriel` method, not a traditional maximum HR.
+  The Friel zone bands are anchored on LTHR, not on a percentage of max.
+* The recovery reading is 60 seconds after the last active reading, which exceeds the default `cooldownGap` of 55 seconds, so `recoveryHrDrop` is populated.
+* `calculateBanisterTrimp` uses `profile.measuredMaxHr ?? profile.estimatedMaxHr`.
+  Here, there is no measured max, so the Tanaka estimate for age 38 is used.
+  Supply `measuredMaxHr` for a more accurate Banister score.
+
+== Example 3: post-MI patient with clinician cap and beta-blocker
+
+=== Scenario
+
+A 62-year-old post-myocardial-infarction patient has been cleared for supervised exercise.
+Their cardiologist has prescribed a maximum heart rate of 120 bpm.
+They also take beta-blockers.
+The application should display their zones and a clear reliability indicator.
+
+=== Code
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+
+void main() {
+  final profile = HealthProfile(
+    age: 62,
+    restingHr: 55,
+    clinicianMaxHr: 120,
+    betaBlocker: true,
+  );
+
+  final config = calculateZones(profile)!;
+
+  // Despite betaBlocker: true, reliability is high because
+  // the clinician cap is authoritative.
+  print('Method:      ${config.method.name}');        // clinicianCap
+  print('Reliability: ${config.reliability.name}');   // high
+  print('Max HR used: ${config.maxHr} bpm');          // 120
+  print('Reason:      ${config.reason}');
+  print('');
+
+  for (final zone in config.zones) {
+    final upper = zone.upperBound?.toString() ?? 'max';
+    print('${zone.displayLabel}: ${zone.lowerBound}–$upper bpm');
+  }
+
+  // Simulate a gentle 20-minute walk session.
+  final readings = [
+    HrReading(bpm: 68,  elapsed: Duration.zero),
+    HrReading(bpm: 80,  elapsed: Duration(minutes: 3)),
+    HrReading(bpm: 95,  elapsed: Duration(minutes: 8)),
+    HrReading(bpm: 100, elapsed: Duration(minutes: 15)),
+    HrReading(bpm: 90,  elapsed: Duration(minutes: 20)),
+    // Recovery reading taken 90 s after the session ended.
+    HrReading(bpm: 74,  elapsed: Duration(minutes: 21, seconds: 30)),
+  ];
+
+  final summary = calculateTimeInZones(readings, config);
+
+  print('');
+  print('Time in zone:');
+  for (final zd in summary.zoneDurations) {
+    if (zd.duration > Duration.zero) {
+      print('  ${zd.zone.label}: ${zd.duration.inMinutes} min');
+    }
+  }
+
+  print('Moderate or higher: '
+        '${summary.moderateOrHigherDuration.inMinutes} min');
+
+  if (summary.recoveryHrDrop != null) {
+    print('Recovery HR drop: ${summary.recoveryHrDrop} bpm');
+  }
+
+  final edwards = calculateEdwardsTrimp(summary);
+  print('');
+  print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
+
+  // Banister requires restingHr and a resolvable max HR.
+  // The clinician cap is in clinicianMaxHr, but calculateBanisterTrimp
+  // resolves max via measuredMaxHr ?? estimatedMaxHr.
+  // Supply measuredMaxHr if you want Banister aligned with the cap.
+  final profileForBanister = profile.copyWith(measuredMaxHr: 120);
+  final banister = calculateBanisterTrimp(readings, profileForBanister);
+  print('Banister TRIMP: ${banister?.toStringAsFixed(2) ?? "n/a"}');
+}
+----
+
+=== Notes
+
+* The clinician cap takes priority (position 2 in the chain) and overrides caution mode.
+  Reliability is `high` regardless of `betaBlocker: true`.
+* `calculateBanisterTrimp` resolves max HR via `profile.measuredMaxHr ?? profile.estimatedMaxHr`, not `clinicianMaxHr`.
+  To align Banister's max HR with the clinical cap, copy the profile with `measuredMaxHr: 120` as shown.
+* For a clinical UI, display `config.reason` prominently and check `config.reliability` before showing any zones to an end user.
+
+== Running the package example
+
+The package ships with a CLI example that exercises all methods and prints a full report:
+
+[source,bash]
+----
+dart run example/hr_zones_example.dart
+----
+
+The source is at `example/hr_zones_example.dart` in the repository.

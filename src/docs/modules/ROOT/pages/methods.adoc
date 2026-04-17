@@ -1,0 +1,294 @@
+= Calculation Methods
+Paul Snow
+:description: All six hr_zones calculation methods: when to use each, required inputs, reliability, and Dart examples.
+
+`hr_zones` supports six zone calculation methods.
+You do not normally need to select one explicitly — the xref:concepts.adoc#the-priority-chain[priority chain] picks the best available method for the data you supply.
+This page describes each method in detail so you can understand what data to provide and what to expect.
+
+== Priority chain overview
+
+[mermaid]
+....
+include::example$priority-chain.mmd[]
+....
+
+The sections below follow the same priority order.
+
+== Custom zones
+
+*Priority:* 1 | *Reliability:* always `high`
+
+=== When to use
+
+Use custom zones when a coach, clinician, or the athlete themselves has pre-defined BPM boundaries for each zone.
+This method bypasses all age- and formula-based estimation.
+
+=== Required inputs
+
+`HealthProfile.customZones` must be set to a `CustomZoneBoundary` value.
+
+=== Inputs
+
+[cols="2,3", options="header"]
+|===
+|Field |Description
+
+|`zone1Lower` |Lower bound (inclusive) of zone 1 in bpm
+|`zone2Lower` |Lower bound (inclusive) of zone 2 in bpm
+|`zone3Lower` |Lower bound (inclusive) of zone 3 in bpm
+|`zone4Lower` |Lower bound (inclusive) of zone 4 in bpm
+|`zone5Lower` |Lower bound (inclusive) of zone 5 in bpm
+|`labels` |Optional list of five effort label strings
+|===
+
+=== Example
+
+[source,dart]
+----
+final config = calculateZones(HealthProfile(
+  customZones: CustomZoneBoundary(
+    zone1Lower: 95,
+    zone2Lower: 114,
+    zone3Lower: 133,
+    zone4Lower: 152,
+    zone5Lower: 171,
+    labels: ['Marathon', 'Endurance', 'Tempo', 'Threshold', 'VO2 Max'],
+  ),
+));
+// method: custom, reliability: high
+----
+
+=== Gotchas
+
+* `lowerPercent` and `upperPercent` on each `CalculatedZone` are both `0` — percentages are not meaningful when BPM bounds are explicitly provided.
+* Other `HealthProfile` fields are ignored by this method, but caution flags still populate in `ZoneConfiguration.reason` as informational context.
+
+== Clinician cap
+
+*Priority:* 2 | *Reliability:* always `high`
+
+=== When to use
+
+Use the clinician cap when a prescribing clinician has specified a maximum heart rate the patient must not exceed.
+This is the only method that overrides caution mode — even when `betaBlocker` or `heartCondition` are set, the clinician's guidance takes precedence and reliability remains `high`.
+
+=== Required inputs
+
+`HealthProfile.clinicianMaxHr`
+
+=== Example
+
+[source,dart]
+----
+final config = calculateZones(HealthProfile(
+  clinicianMaxHr: 130,
+));
+// method: clinicianCap, reliability: high, maxHr: 130
+----
+
+[source,dart]
+----
+// Caution flags are present but do NOT downgrade reliability when a
+// clinician cap is set.
+final config = calculateZones(HealthProfile(
+  age: 55,
+  clinicianMaxHr: 130,
+  betaBlocker: true,
+));
+// method: clinicianCap, reliability: high, maxHr: 130
+----
+
+=== Gotchas
+
+* The `clinicianMaxHr` field is taken as an absolute cap.
+  The standard percentage bands are applied to it just as they would be for any max-HR method.
+* If you also supply `customZones`, custom wins — it is higher priority.
+  In most clinical contexts you will use one or the other.
+
+== LTHR / Friel
+
+*Priority:* 3 | *Reliability:* `high` (without caution), `low` (with caution, no clinician cap)
+
+=== When to use
+
+Use the LTHR method when the athlete has a measured lactate threshold heart rate — for example from a 30-minute time-trial protocol or a lab lactate test.
+LTHR is a measured threshold value and, when available, provides a stronger anchor than the HRR fallback because it reflects actual metabolic thresholds rather than an estimated maximum.
+
+=== Required inputs
+
+`HealthProfile.lactateThresholdHr`
+
+=== Zone bands (Friel)
+
+[cols="1,2,2", options="header"]
+|===
+|Zone |% of LTHR |Descriptor
+
+|1 |0 – 84 % |Recovery
+|2 |85 – 89 % |Aerobic
+|3 |90 – 94 % |Tempo
+|4 |95 – 99 % |Subthreshold
+|5 |>= 100 % |Suprathreshold
+|===
+
+`ZoneConfiguration.maxHr` holds the LTHR value (not a true maximum HR) when this method is active.
+`CalculatedZone.lowerPercent` and `upperPercent` are fractions of LTHR.
+
+=== Example
+
+[source,dart]
+----
+// Athlete tested at 160 bpm over a 30-minute time trial.
+final config = calculateZones(HealthProfile(
+  lactateThresholdHr: 160,
+))!;
+
+print('Method:  ${config.method.name}');  // lthrFriel
+print('Anchor:  ${config.maxHr} bpm');    // 160
+
+for (final zone in config.zones) {
+  // upperBound is exclusive; subtract 1 for an inclusive display.
+  final upper =
+      zone.upperBound != null ? '${zone.upperBound! - 1}' : 'max';
+  print('${zone.label}: ${zone.lowerBound}–$upper bpm');
+}
+// Zone 1 – Recovery: 0–135 bpm
+// Zone 2 – Base Fitness: 136–143 bpm
+// Zone 3 – Aerobic: 144–151 bpm
+// Zone 4 – Lactate Threshold: 152–159 bpm
+// Zone 5 – VO₂ Max: 160–max bpm
+----
+
+=== Gotchas
+
+* Because `maxHr` holds the LTHR value, do not compare it directly with a measured maximum HR.
+  Use `config.method == ZoneMethod.lthrFriel` to detect this case in your UI.
+* The Friel bands differ from the standard percentage-of-max bands.
+  If you supply both `lactateThresholdHr` and `measuredMaxHr`, the LTHR method wins (it is higher priority).
+
+== HRR / Karvonen
+
+*Priority:* 4 | *Reliability:* `high` (measured max, no caution), `medium` (estimated max, no caution), `low` (caution mode, no clinician cap)
+
+=== When to use
+
+Use HRR/Karvonen when you have a resting heart rate.
+It scales zones relative to the usable heart rate range (max minus resting), which makes zones more accurate for athletes with a low resting HR than a simple percentage of max.
+
+=== Required inputs
+
+`HealthProfile.restingHr` plus either `measuredMaxHr` or `age` (for an estimated max).
+
+=== Formula
+
+[source,text]
+----
+targetHR = (maxHR - restingHR) x intensity + restingHR
+----
+
+Where `intensity` is the lower or upper bound percentage for the zone.
+
+=== Example
+
+[source,dart]
+----
+// With measured max — reliability: high
+final config = calculateZones(HealthProfile(
+  measuredMaxHr: 185,
+  restingHr: 58,
+))!;
+// method: hrrKarvonen, reliability: high
+
+// With age only — reliability: medium
+final config2 = calculateZones(HealthProfile(
+  age: 35,
+  restingHr: 58,
+))!;
+// method: hrrKarvonen, reliability: medium
+----
+
+=== Gotchas
+
+* If `restingHr` is missing, Karvonen is skipped and the calculator falls back to percent-of-measured-max or percent-of-estimated-max.
+* The `measuredMaxHr` is preferred over an age estimate when both are available.
+
+== Percent of measured max
+
+*Priority:* 5 | *Reliability:* `high` (no caution), `low` (caution mode, no clinician cap)
+
+=== When to use
+
+Use this method when you have a measured max HR but no resting HR.
+It is simpler than Karvonen but still higher quality than an age estimate.
+
+=== Required inputs
+
+`HealthProfile.measuredMaxHr`
+
+=== Example
+
+[source,dart]
+----
+final config = calculateZones(HealthProfile(measuredMaxHr: 188))!;
+// method: percentOfMeasuredMax, reliability: high
+----
+
+== Percent of estimated max
+
+*Priority:* 6 | *Reliability:* `medium` (no caution), `low` (caution mode, no clinician cap)
+
+=== When to use
+
+This is the fallback method when only age is known.
+It uses `HealthProfile.maxHrFormula` (default: Tanaka) to estimate max HR and applies the standard percentage bands to that estimate.
+
+=== Required inputs
+
+`HealthProfile.age`
+
+=== Example
+
+[source,dart]
+----
+final config = calculateZones(HealthProfile(age: 35))!;
+// method: percentOfEstimatedMax, reliability: medium
+// maxHr derived from Tanaka: 208 - 0.7 * 35 = 184 bpm
+
+// Switch to Fox 220 for compatibility with legacy tooling
+final config2 = calculateZones(HealthProfile(
+  age: 35,
+  maxHrFormula: MaxHrFormula.fox220,
+))!;
+// maxHr: 220 - 35 = 185 bpm
+----
+
+See xref:max-hr-formulas.adoc[Max HR Formulas] for a comparison of all six supported formulas.
+
+=== Gotchas
+
+* This method returns `null` only if `age` is also `null` — it is always the last resort.
+* `medium` reliability reflects the inherent uncertainty in age-based estimation; the actual max HR can vary significantly from the formula prediction.
+
+== Overriding bands, labels, and colours
+
+Any call to `calculateZones` accepts five per-call override parameters.
+Each must be a list of exactly five elements:
+
+[source,dart]
+----
+final config = calculateZones(
+  HealthProfile(age: 40),
+  bands: [
+    (45.0, 60.0), (60.0, 70.0), (70.0, 80.0),
+    (80.0, 90.0), (90.0, 100.0),
+  ],
+  labels: ['Warm-up', 'Easy', 'Tempo', 'Threshold', 'Max'],
+  effortLabels: ['Warm-up', 'Easy', 'Tempo', 'Threshold', 'Max'],
+  descriptiveLabels: ['', '', '', '', ''],
+  colors: [0xFF4FC3F7, 0xFF81C784, 0xFFFFD54F, 0xFFFF8A65, 0xFFE57373],
+);
+----
+
+Colours are plain `int` values in `0xAARRGGBB` format.
+The package has no dependency on `dart:ui` or Flutter, so colour handling is the caller's responsibility.

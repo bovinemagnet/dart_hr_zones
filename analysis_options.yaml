@@ -25,7 +25,6 @@ linter:
     - dangling_library_doc_comments
     - depend_on_referenced_packages
     - deprecated_member_use_from_same_package
-    - document_ignores
     - empty_statements
     - implicit_reopen
     - invalid_case_patterns

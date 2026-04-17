@@ -1,0 +1,116 @@
+= Caution Mode
+Paul Snow
+:description: How beta-blocker and heart-condition flags affect zone reliability in hr_zones, and how the clinician cap overrides them.
+
+Caution mode is active when a `HealthProfile` has `betaBlocker: true` or `heartCondition: true` (or both).
+It signals that standard age- or effort-based zone calculation may produce unsafe guidance for this individual, and the library responds by downgrading the reliability of the result.
+
+== What caution mode does
+
+When caution mode is active and *no clinician cap is set*, the priority chain still runs normally and returns a `ZoneConfiguration` as usual.
+The difference is:
+
+* `ZoneConfiguration.reliability` is forced to `low`, regardless of the method chosen.
+* `ZoneConfiguration.reason` names the active flags and recommends obtaining a clinician-prescribed cap.
+
+The zones themselves are not blocked or clamped — the library does not make clinical decisions for you.
+It surfaces the uncertainty so that your application or the user can act on it appropriately.
+
+[source,dart]
+----
+final config = calculateZones(HealthProfile(
+  age: 55,
+  restingHr: 62,
+  betaBlocker: true,
+))!;
+
+print(config.method.name);      // hrrKarvonen
+print(config.reliability.name); // low
+print(config.reason);
+// "Caution mode (beta blocker medication reported). Using heart rate reserve
+//  (Karvonen) method. Consider setting a clinician-provided maximum heart rate."
+----
+
+== Why beta-blockers matter
+
+Beta-blockers are a class of medication that inhibit the effect of adrenaline on the heart.
+They reduce resting and maximum heart rate, meaning that the standard age-based formulas — and even a measured "effort" max — may understate true physiological load.
+A heart rate that appears moderate by the formula could represent a higher exertion level for this individual.
+
+== Why heart conditions matter
+
+A known heart condition may mean that zones derived from population norms are not appropriate.
+In some conditions (such as certain arrhythmias or post-cardiac-event recovery) the safe upper limit is lower than the formula would predict.
+Setting `heartCondition: true` flags this so that the caller can surface appropriate guidance.
+
+== The clinician cap override
+
+When `HealthProfile.clinicianMaxHr` is set, the clinician cap method takes priority (position 2 in the chain) and its reliability is *always* `high` — caution flags do not override it.
+
+The rationale: a prescribing clinician has assessed the individual and determined a safe ceiling.
+That assessment is authoritative and should take precedence over any software heuristic.
+
+[source,dart]
+----
+// Caution flags are present but the clinician cap takes precedence.
+final config = calculateZones(HealthProfile(
+  age: 55,
+  clinicianMaxHr: 130,
+  betaBlocker: true,
+  heartCondition: true,
+))!;
+
+print(config.method.name);      // clinicianCap
+print(config.reliability.name); // high
+print(config.maxHr);            // 130
+----
+
+NOTE: Custom zones also bypass caution-mode downgrading with `high` reliability, because explicit BPM bounds are supplied directly and do not depend on any formula.
+
+== Caution mode and `isCautionMode`
+
+`HealthProfile.isCautionMode` is a convenience getter:
+
+[source,dart]
+----
+final profile = HealthProfile(betaBlocker: true);
+print(profile.isCautionMode); // true
+
+final safe = HealthProfile(age: 35);
+print(safe.isCautionMode); // false
+----
+
+Use it in your UI to decide whether to show a warning banner or prompt the user to enter a clinician-prescribed cap.
+
+== Recommended UX pattern
+
+A typical implementation might:
+
+1. Show the zone configuration regardless of reliability.
+2. Check `config.reliability == ZoneReliability.low`.
+3. If true, display `config.reason` as a subtitle or in-line warning.
+4. Provide a UI path for the user to enter a `clinicianMaxHr` and recalculate.
+
+[source,dart]
+----
+final config = calculateZones(profile);
+if (config == null) {
+  // prompt for more data
+} else if (config.reliability == ZoneReliability.low) {
+  showWarning(config.reason);
+}
+----
+
+== Summary
+
+[cols="3,1,3", options="header"]
+|===
+|Scenario |Reliability |Notes
+
+|`betaBlocker: true`, no clinician cap |`low` |Method still runs; reason string advises obtaining a cap
+|`heartCondition: true`, no clinician cap |`low` |As above
+|Both flags, no clinician cap |`low` |As above; both flags named in reason string
+|`betaBlocker: true`, `clinicianMaxHr` set |`high` |Clinician cap wins; caution flags are informational only
+|`heartCondition: true`, `clinicianMaxHr` set |`high` |As above
+|Custom zones (any caution state) |`high` |Explicit bounds bypass formula uncertainty
+|===

@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.2] - 2026-04-17
+
+### Added
+
+- Three additional `MaxHrFormula` entries:
+  - `gellish2007` — `207 − 0.7 × age` (Gellish et al. 2007).
+  - `astrand` — `216.6 − 0.84 × age` (Åstrand 1952).
+  - `millerFaulkner` — `217 − 0.85 × age` (Miller, Wallace & Eggert 1993).
+- `HealthProfile.lactateThresholdHr` optional input, plus
+  `copyWith(..., lactateThresholdHr, clearLactateThresholdHr)` support.
+- `ZoneMethod.lthrFriel` — sixth calculation method using Joe Friel's 5-zone
+  LTHR-anchored bands. Priority-chain position: after clinician cap, before
+  HRR/Karvonen.
+- `ZoneConfiguration.maxHr` dartdoc clarifies that for `ZoneMethod.lthrFriel`
+  the field holds the LTHR anchor value; method disambiguates semantics.
+- New `lib/src/training_load.dart` (exported from `lib/hr_zones.dart`):
+  - `calculateEdwardsTrimp(TimeInZoneSummary) → double` — zone-weighted
+    training load (Edwards 1993).
+  - `calculateBanisterTrimp(readings, profile, {coefficients}) → double?` —
+    exponentially-weighted HRR training load (Banister 1991).
+  - `BanisterCoefficients` with `male()` / `female()` named constructors and
+    a custom constructor for cohort-specific weighting pairs.
+- Example CLI exercises every method including LTHR and prints Edwards and
+  Banister TRIMP scores alongside the time-in-zone summary.
+
+### Changed
+
+- Shortened the pubspec description to fit pub.dev's 60–180 character limit so
+  the package scores full marks for the "Follow Dart file conventions" check.
+
+### Fixed
+
+- Removed the `document_ignores` lint rule from `analysis_options.yaml` so the
+  analyzer passes on the Dart 3.4.0 SDK floor; the rule was only added in
+  Dart 3.5.
+
 ## [0.0.1] - 2026-04-17
 
 ### Added

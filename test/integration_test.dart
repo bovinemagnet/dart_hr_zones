@@ -105,6 +105,59 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // LTHR (Friel) pipeline
+  // -------------------------------------------------------------------------
+  group('LTHR (Friel) pipeline', () {
+    test('LTHR profile drives time-in-zone with LTHR-anchored bounds', () {
+      // LTHR = 160 → zone 2 lower = 136, zone 4 lower = 152, zone 5 lower = 160.
+      const profile = HealthProfile(lactateThresholdHr: 160);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.lthrFriel);
+
+      final readings = [
+        const HrReading(bpm: 140, elapsed: Duration.zero), // zone 2
+        const HrReading(bpm: 155, elapsed: Duration(minutes: 5)), // zone 4
+        const HrReading(bpm: 165, elapsed: Duration(minutes: 10)), // zone 5
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      expect(summary.durationInZone(2), const Duration(minutes: 5));
+      expect(summary.durationInZone(4), const Duration(minutes: 5));
+      expect(
+        summary.moderateOrHigherDuration,
+        const Duration(minutes: 5),
+      ); // only zone 4 interval counts (≥ 3)
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Training load — LTHR config feeding both TRIMP variants
+  // -------------------------------------------------------------------------
+  group('training load via LTHR pipeline', () {
+    test('LTHR config → Edwards TRIMP is positive', () {
+      const profile = HealthProfile(
+        age: 40,
+        restingHr: 60,
+        lactateThresholdHr: 160,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.lthrFriel);
+
+      final readings = [
+        const HrReading(bpm: 140, elapsed: Duration.zero),
+        const HrReading(bpm: 155, elapsed: Duration(minutes: 10)),
+        const HrReading(bpm: 165, elapsed: Duration(minutes: 20)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      final edwards = calculateEdwardsTrimp(summary);
+      expect(edwards, greaterThan(0));
+
+      final banister = calculateBanisterTrimp(readings, profile);
+      expect(banister, isNotNull);
+      expect(banister!, greaterThan(0));
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Consistency: time-in-zone attribution matches currentZoneFromConfig
   // -------------------------------------------------------------------------
   group('per-reading consistency', () {

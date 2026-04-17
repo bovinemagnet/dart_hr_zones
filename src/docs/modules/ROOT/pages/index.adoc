@@ -1,0 +1,65 @@
+= hr_zones
+Paul Snow
+:description: A pure-Dart heart rate zone calculator with automatic method selection, reliability grading, and time-in-zone analysis.
+
+`hr_zones` is a pure-Dart package for calculating personalised heart rate training zones.
+It selects the most reliable calculation method from the data you provide, grades the result, and gives you a human-readable explanation of the decision — all with zero runtime dependencies.
+The package works on every Dart target: Flutter, server, CLI, and web.
+
+Zone data alone is only the beginning.
+The package also accumulates time-in-zone from a sequence of heart rate readings and computes two industry-standard training-load scores — Edwards TRIMP and Banister TRIMP — so you have everything you need to build a complete activity-analysis pipeline from a single import.
+
+Colours, labels, and zone bands are all overridable per call, so the library adapts to any design system or coaching methodology without requiring a fork.
+
+== Headline features
+
+* *Six calculation methods* — custom boundaries, clinician cap, LTHR/Friel, HRR/Karvonen, percent of measured max, percent of estimated max.
+* *Priority chain* — automatically selects the most reliable method the provided data supports.
+* *Six max-HR formulas* — Tanaka (default), Fox 220, Nes, Gellish 2007, Åstrand, and Miller–Faulkner; selectable per profile.
+* *Reliability grading* — `high`, `medium`, or `low` based on input quality and medical flags.
+* *Clinician-first safety* — a clinician-prescribed cap overrides caution mode with `high` reliability.
+* *Caution mode* — beta-blocker and heart-condition flags downgrade reliability when no clinician cap is present.
+* *Time-in-zone analysis* — per-zone durations, moderate-or-higher totals, and cooldown-gated recovery HR drop.
+* *Training load* — Edwards TRIMP (zone-weighted minutes) and Banister TRIMP (HRR-weighted exponential).
+* *Configurable outputs* — override zone bands, combined labels, effort labels, physiological labels, and colours per call.
+* *No platform code* — pure Dart; no `dart:ui`, no Flutter, no platform channels.
+
+== Where to start
+
+xref:getting-started.adoc[Getting Started]:: Install the package and run your first zone calculation in under five minutes.
+xref:concepts.adoc[Core Concepts]:: Understand the five-zone model, the priority chain, and reliability grading.
+xref:methods.adoc[Calculation Methods]:: Detailed guidance on when to use each of the six methods.
+xref:examples.adoc[Examples]:: End-to-end worked walkthroughs for common athlete and clinical profiles.
+
+== Quick example
+
+[source,dart]
+----
+import 'package:hr_zones/hr_zones.dart';
+
+void main() {
+  final profile = HealthProfile(age: 35, restingHr: 60);
+  final config = calculateZones(profile);
+
+  if (config != null) {
+    print('Method:      ${config.method.name}');
+    print('Reliability: ${config.reliability.name}');
+    print('Reason:      ${config.reason}');
+    for (final zone in config.zones) {
+      final upper = zone.upperBound?.toString() ?? 'max';
+      print('${zone.displayLabel}: ${zone.lowerBound}–$upper bpm');
+    }
+  }
+}
+----
+
+== Package information
+
+[cols="1,2"]
+|===
+|Licence |Apache 2.0
+|Pub page |https://pub.dev/packages/hr_zones
+|Source |https://github.com/bovinemagnet/dart_hr_zones
+|SDK floor |Dart 3.4.0
+|Runtime dependencies |none
+|===

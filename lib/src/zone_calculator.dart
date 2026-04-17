@@ -13,6 +13,11 @@ enum ZoneMethod {
   /// applying standard percentage bands to that cap.
   clinicianCap,
 
+  /// Lactate-Threshold-Heart-Rate method using Joe Friel's published 5-zone
+  /// bands anchored on [HealthProfile.lactateThresholdHr]. Preferred over
+  /// max-HR methods for athletes who have a measured threshold value.
+  lthrFriel,
+
   /// Heart-Rate Reserve (Karvonen) method:
   /// `targetHR = (maxHR − restingHR) × intensity + restingHR`.
   /// Requires both a maximum heart rate (measured or estimated) and a resting
@@ -132,9 +137,15 @@ class ZoneConfiguration {
   /// The reliability grade for this configuration.
   final ZoneReliability reliability;
 
-  /// The maximum heart rate (in bpm) used to compute the zones.
+  /// The anchor heart rate (in bpm) used to compute the zones.
   ///
-  /// May be measured, estimated, or a clinician cap depending on [method].
+  /// For max-HR-based methods ([ZoneMethod.clinicianCap],
+  /// [ZoneMethod.hrrKarvonen], [ZoneMethod.percentOfMeasuredMax],
+  /// [ZoneMethod.percentOfEstimatedMax]) this is the maximum heart rate.
+  /// For [ZoneMethod.lthrFriel] this is the lactate-threshold heart rate used
+  /// as the band anchor. The `method` field disambiguates which semantic
+  /// applies. [CalculatedZone.lowerPercent] / [CalculatedZone.upperPercent]
+  /// remain fractions of this value.
   final int maxHr;
 
   /// Human-readable explanation of why this method and reliability were
@@ -168,6 +179,17 @@ const List<(double, double)> _defaultBands = [
   (70.0, 80.0), // Zone 3 – Aerobic
   (80.0, 90.0), // Zone 4 – Lactate Threshold
   (90.0, 100.0), // Zone 5 – VO₂ Max
+];
+
+/// Default Friel 5-zone bands expressed as percentages of the lactate
+/// threshold heart rate (LTHR). Zone 5 extends above 100 % of LTHR; the
+/// upper value is used to compute `upperPercent` and is not a hard cap.
+const List<(double, double)> _defaultFrielBands = [
+  (0.0, 85.0), // Zone 1 – Recovery (< 85 % LTHR)
+  (85.0, 90.0), // Zone 2 – Aerobic
+  (90.0, 95.0), // Zone 3 – Tempo
+  (95.0, 100.0), // Zone 4 – Subthreshold
+  (100.0, 110.0), // Zone 5 – Suprathreshold (≥ 100 % LTHR)
 ];
 
 /// Default combined zone labels.
@@ -218,12 +240,20 @@ const List<int> _defaultColors = [
 /// 2. [ZoneMethod.clinicianCap] — if [HealthProfile.clinicianMaxHr] is set.
 ///    Always wins over the fallback chain; reliability is `high` even in
 ///    caution mode because the clinician's guidance is authoritative.
-/// 3. [ZoneMethod.hrrKarvonen] — if both a max HR (measured or estimated) and
+/// 3. [ZoneMethod.lthrFriel] — if [HealthProfile.lactateThresholdHr] is set.
+///    LTHR is a measured threshold value; when available it anchors zones
+///    more accurately than an HRR/Karvonen fallback that may use an
+///    age-estimated max.
+/// 4. [ZoneMethod.hrrKarvonen] — if both a max HR (measured or estimated) and
 ///    [HealthProfile.restingHr] are available.
-/// 4. [ZoneMethod.percentOfMeasuredMax] — if [HealthProfile.measuredMaxHr]
+/// 5. [ZoneMethod.percentOfMeasuredMax] — if [HealthProfile.measuredMaxHr]
 ///    is set.
-/// 5. [ZoneMethod.percentOfEstimatedMax] — using
+/// 6. [ZoneMethod.percentOfEstimatedMax] — using
 ///    [HealthProfile.maxHrFormula] (default Tanaka `208 − 0.7 × age`).
+///
+/// For max-HR-based methods, [bands] entries are fractions of the resolved
+/// max HR. For [ZoneMethod.lthrFriel] they are fractions of LTHR; when
+/// omitted, Friel's default 5-zone bands are used.
 ///
 /// Returns `null` if none of the methods can produce zones from the available
 /// data.
@@ -236,6 +266,7 @@ ZoneConfiguration? calculateZones(
   List<int>? colors,
 }) {
   final effectiveBands = bands ?? _defaultBands;
+  final effectiveFrielBands = bands ?? _defaultFrielBands;
   final effectiveLabels = labels ?? _defaultLabels;
   final effectiveEfforts = effortLabels ?? _defaultEffortLabels;
   final effectiveDescs = descriptiveLabels ?? _defaultDescriptiveLabels;
@@ -281,10 +312,29 @@ ZoneConfiguration? calculateZones(
     );
   }
 
+  // 3. LTHR (Friel) — anchored on a measured lactate threshold value. Runs
+  // below the clinician cap but above HRR/Karvonen: LTHR is measured data
+  // whereas Karvonen may be falling back to an age-estimated max.
+  final lthr = profile.lactateThresholdHr;
+  if (lthr != null) {
+    final reliability =
+        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.high;
+    return _lthrFrielZones(
+      lthr: lthr,
+      reliability: reliability,
+      reason: _reasonFor(profile, ZoneMethod.lthrFriel, reliability),
+      bands: effectiveFrielBands,
+      labels: effectiveLabels,
+      efforts: effectiveEfforts,
+      descs: effectiveDescs,
+      colors: effectiveColors,
+    );
+  }
+
   // Resolve best available max HR for Karvonen and percentage methods.
   final resolvedMax = _resolveMaxHr(profile);
 
-  // 3. HRR / Karvonen
+  // 4. HRR / Karvonen
   final restingHr = profile.restingHr;
   if (resolvedMax != null && restingHr != null) {
     final reliability = profile.isCautionMode
@@ -303,7 +353,7 @@ ZoneConfiguration? calculateZones(
     );
   }
 
-  // 4. Percent of measured max
+  // 5. Percent of measured max
   final measuredMax = profile.measuredMaxHr;
   if (measuredMax != null) {
     final reliability =
@@ -321,7 +371,7 @@ ZoneConfiguration? calculateZones(
     );
   }
 
-  // 5. Percent of estimated max (via profile.maxHrFormula)
+  // 6. Percent of estimated max (via profile.maxHrFormula)
   final estimated = profile.estimatedMaxHr;
   if (estimated != null) {
     final reliability =
@@ -386,6 +436,7 @@ String _reasonFor(
           '(${profile.maxHrFormula.displayName})',
     ZoneMethod.custom => 'Using custom zone boundaries',
     ZoneMethod.clinicianCap => 'Using clinician-provided maximum heart rate',
+    ZoneMethod.lthrFriel => 'Using lactate threshold heart rate (Friel) method',
   };
 
   if (reliability != ZoneReliability.low) return baseReason;
@@ -514,6 +565,44 @@ ZoneConfiguration _hrrZones({
     method: ZoneMethod.hrrKarvonen,
     reliability: reliability,
     maxHr: maxHr,
+    reason: reason,
+  );
+}
+
+ZoneConfiguration _lthrFrielZones({
+  required int lthr,
+  required ZoneReliability reliability,
+  required String reason,
+  required List<(double, double)> bands,
+  required List<String> labels,
+  required List<String> efforts,
+  required List<String> descs,
+  required List<int> colors,
+}) {
+  final zones = <CalculatedZone>[];
+  for (var i = 0; i < 5; i++) {
+    final (lower, upper) = bands[i];
+    final lowerBpm = (lthr * lower / 100).round();
+    final upperBpm = i < 4 ? (lthr * upper / 100).round() : null;
+    zones.add(
+      CalculatedZone(
+        zoneNumber: i + 1,
+        label: labels[i],
+        effortLabel: efforts[i],
+        descriptiveLabel: descs[i],
+        lowerBound: lowerBpm,
+        upperBound: upperBpm,
+        color: colors[i],
+        lowerPercent: lower / 100,
+        upperPercent: upper / 100,
+      ),
+    );
+  }
+  return ZoneConfiguration(
+    zones: zones,
+    method: ZoneMethod.lthrFriel,
+    reliability: reliability,
+    maxHr: lthr,
     reason: reason,
   );
 }

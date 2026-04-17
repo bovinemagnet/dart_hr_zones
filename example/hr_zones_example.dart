@@ -38,6 +38,10 @@ void main() {
   const foxProfile = HealthProfile(age: 35, maxHrFormula: MaxHrFormula.fox220);
   _printConfig(calculateZones(foxProfile)!);
 
+  _printSection('Method 6 – LTHR (Friel zones)');
+  const frielProfile = HealthProfile(lactateThresholdHr: 160);
+  _printConfig(calculateZones(frielProfile)!);
+
   _printSection('Clinician cap wins over caution mode');
   const cautionProfile = HealthProfile(
     age: 55,
@@ -105,6 +109,15 @@ void _printTime(List<HrReading> readings, ZoneConfiguration config) {
     final secs = zd.duration.inSeconds;
     final bar = '█' * (secs ~/ 5);
     print('  ${zd.zone.displayLabel.padRight(24)} $bar ${secs}s');
+  }
+  final edwards = calculateEdwardsTrimp(summary);
+  final banister = calculateBanisterTrimp(
+    readings,
+    const HealthProfile(age: 40, restingHr: 60),
+  );
+  print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
+  if (banister != null) {
+    print('Banister TRIMP (male): ${banister.toStringAsFixed(1)}');
   }
   print('');
 }

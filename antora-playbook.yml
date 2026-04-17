@@ -1,0 +1,24 @@
+site:
+  title: hr_zones Documentation
+  url: http://localhost:8080
+
+content:
+  sources:
+    - url: .
+      branches: HEAD
+      start_path: src/docs
+
+asciidoc:
+  extensions:
+    - asciidoctor-kroki
+  attributes:
+    kroki-fetch-diagram: true
+    kroki-default-format: svg
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+
+output:
+  dir: ./build/site

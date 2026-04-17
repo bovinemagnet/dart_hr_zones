@@ -1,0 +1,79 @@
+= Changelog
+Paul Snow
+:description: Release history for the hr_zones Dart package.
+
+All notable changes to `hr_zones` are recorded here.
+The format follows https://keepachangelog.com/en/1.1.0/[Keep a Changelog].
+This project adheres to https://semver.org/spec/v2.0.0.html[Semantic Versioning].
+
+For the complete raw changelog, see `CHANGELOG.md` in the https://github.com/bovinemagnet/dart_hr_zones[repository].
+
+== 0.0.2 (2026-04-17)
+
+=== New features
+
+Six-method priority chain::
+The priority chain grows to six methods with the addition of the LTHR/Friel method.
+Position 3 in the chain: after clinician cap, before HRR/Karvonen.
+When a measured lactate threshold is available it provides a more meaningful anchor than an estimated max.
+
+LTHR / Friel zones (`ZoneMethod.lthrFriel`)::
+`HealthProfile` gains `lactateThresholdHr` (and matching `copyWith` / `clearLactateThresholdHr` support).
+Zones are computed using Joe Friel's five-zone bands expressed as percentages of LTHR.
+`ZoneConfiguration.maxHr` holds the LTHR anchor when this method is active.
+
+Three additional max-HR formulas::
+`MaxHrFormula` adds `gellish2007` (`207 − 0.7 × age`), `astrand` (`216.6 − 0.84 × age`), and `millerFaulkner` (`217 − 0.85 × age`).
+The enum now has six values.
+See xref:max-hr-formulas.adoc[Max HR Formulas] for citations and sample calculations.
+
+Training-load functions::
+New `calculateEdwardsTrimp(TimeInZoneSummary)` and `calculateBanisterTrimp(List<HrReading>, HealthProfile, {coefficients})`.
+Also adds `BanisterCoefficients` with `male()` (a=0.64, b=1.92) and `female()` (a=0.86, b=1.67) named constructors.
+See xref:training-load.adoc[Training Load (TRIMP)] for details.
+
+=== Changes
+
+Pubspec description shortened to satisfy pub.dev's 60–180 character limit and achieve full marks on the "Follow Dart file conventions" check.
+
+=== Fixes
+
+Removed the `document_ignores` lint rule from `analysis_options.yaml` so the analyser passes on the Dart 3.4.0 SDK floor (the rule was only added in Dart 3.5).
+
+== 0.0.1 (2026-04-17)
+
+Initial release.
+
+=== Added
+
+HealthProfile input model::
+Accepts `age`, `restingHr`, `measuredMaxHr`, `clinicianMaxHr`, `betaBlocker`, `heartCondition`, `customZones`, and `maxHrFormula`.
+Provides `estimatedMaxHr`, `isCautionMode`, and `copyWith`.
+
+MaxHrFormula enum (three values)::
+`tanaka` (default), `fox220`, and `nes`.
+Extension `MaxHrFormulaApply` adds `.apply(age)` and `.displayName`.
+
+Five-method priority chain::
+`calculateZones(HealthProfile, {bands, labels, effortLabels, descriptiveLabels, colors})` returning `ZoneConfiguration?`.
+Priority order: custom → clinicianCap → hrrKarvonen → percentOfMeasuredMax → percentOfEstimatedMax.
+
+ZoneConfiguration and CalculatedZone::
+Result type with `zones`, `method`, `reliability`, `maxHr`, and `reason`.
+Each `CalculatedZone` exposes `zoneNumber`, `label`, `effortLabel`, `descriptiveLabel`, `displayLabel`, `lowerBound`, `upperBound`, `color`, `lowerPercent`, `upperPercent`, and `containsBpm`.
+
+Caution mode::
+`betaBlocker` and `heartCondition` flags downgrade reliability to `low` unless a clinician cap is present.
+
+Real-time zone lookup::
+`currentZoneFromConfig(int bpm, ZoneConfiguration)`.
+
+Time-in-zone analysis::
+`HrReading` value type; `calculateTimeInZones` returning `TimeInZoneSummary`; `ZoneDuration`; `ReadingCadence.cooldownGap` constant; cooldown-gated `recoveryHrDrop`.
+
+Full test suite::
+123 tests covering the zone calculator, health profile, time-in-zone calculator, and end-to-end integration pipeline.
+
+CI and publish workflows::
+GitHub Actions CI runs `dart analyze --fatal-infos` and `dart test` on Dart SDK versions 3.4.0, 3.6.0, and `stable`.
+Publish workflow uses OIDC for automated publishing to pub.dev on `vX.Y.Z` tag push.
