@@ -1,5 +1,5 @@
 name: hr_zones
 title: hr_zones
-version: '0.0.2'
+version: '0.0.3'
 nav:
   - modules/ROOT/nav.adoc

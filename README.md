@@ -346,7 +346,7 @@ final banister = calculateBanisterTrimp(
 
 ```yaml
 dependencies:
-  hr_zones: ^0.0.2
+  hr_zones: ^0.0.3
 ```
 
 ```bash
