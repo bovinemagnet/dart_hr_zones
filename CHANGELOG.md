@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.3] - 2026-11-21
 
+### Added
+
+- `.pubignore` file excluding the Antora documentation source
+  (`src/docs/`, `antora-playbook.yml`), CI workflows (`.github/`), and
+  editor config from the pub.dev archive. Archive size drops from
+  roughly 51 KB to 32 KB; consumers no longer download an unused
+  AsciiDoc documentation tree.
+
 ### Changed
 
 - `calculateZones` uses HRR/Karvonen only when `measuredMaxHr` and
@@ -19,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HR 65, zone 1 was 119–129 bpm and is now 86–103 bpm. Callers that relied on
   Karvonen with only `age` and `restingHr` will see lower zone boundaries.
   Training load (`calculateBanisterTrimp`) is unchanged.
+- Commented out the automated `dart pub publish` step in
+  `.github/workflows/publish.yaml`. Publishing to pub.dev is now manual
+  (`dart pub publish`) until automated publishing from GitHub Actions is
+  enabled in the package admin. Tag pushes still run analyze, test, and
+  `pub publish --dry-run`.
 
 ## [0.0.2] - 2026-04-17
 
