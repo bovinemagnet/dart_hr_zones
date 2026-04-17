@@ -24,19 +24,20 @@ void main() {
         [const HrReading(bpm: 120, elapsed: Duration.zero)],
         _config(),
       );
-      expect(summary.zoneDurations.every((zd) => zd.duration == Duration.zero),
-          isTrue);
+      expect(
+        summary.zoneDurations.every((zd) => zd.duration == Duration.zero),
+        isTrue,
+      );
       expect(summary.recoveryHrDrop, isNull);
     });
   });
 
   // -------------------------------------------------------------------------
-  // Basic accumulation
+  // Basic accumulation — Tanaka age 40 → 180 max.
+  // Zone 1: 90–108, Zone 2: 108–126, Zone 3: 126–144, Zone 4: 144–162,
+  // Zone 5: 162+
   // -------------------------------------------------------------------------
   group('calculateTimeInZones — basic accumulation', () {
-    // Profile: age 40 → estimated max 180.
-    // Zone 1: 90–108, Zone 2: 108–126, Zone 3: 126–144, Zone 4: 144–162,
-    // Zone 5: 162+  (50/60/70/80/90 % of 180)
     late ZoneConfiguration config;
 
     setUp(() {
@@ -56,9 +57,9 @@ void main() {
 
     test('mixed zones', () {
       final readings = [
-        const HrReading(bpm: 95, elapsed: Duration.zero), // zone 1 for 5 min
-        const HrReading(bpm: 130, elapsed: Duration(minutes: 5)), // zone 3 for 3 min
-        const HrReading(bpm: 150, elapsed: Duration(minutes: 8)), // zone 4 for 2 min
+        const HrReading(bpm: 95, elapsed: Duration.zero),
+        const HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
+        const HrReading(bpm: 150, elapsed: Duration(minutes: 8)),
         const HrReading(bpm: 100, elapsed: Duration(minutes: 10)),
       ];
       final summary = calculateTimeInZones(readings, config);
@@ -69,49 +70,69 @@ void main() {
 
     test('moderateOrHigher sums zones 3, 4, 5', () {
       final readings = [
-        const HrReading(bpm: 95, elapsed: Duration.zero), // zone 1 for 5 min
-        const HrReading(bpm: 130, elapsed: Duration(minutes: 5)), // zone 3 for 3 min
-        const HrReading(bpm: 150, elapsed: Duration(minutes: 8)), // zone 4 for 2 min
-        const HrReading(bpm: 170, elapsed: Duration(minutes: 10)), // zone 5 for 5 min
+        const HrReading(bpm: 95, elapsed: Duration.zero),
+        const HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
+        const HrReading(bpm: 150, elapsed: Duration(minutes: 8)),
+        const HrReading(bpm: 170, elapsed: Duration(minutes: 10)),
         const HrReading(bpm: 100, elapsed: Duration(minutes: 15)),
       ];
       final summary = calculateTimeInZones(readings, config);
-      // 3 + 2 + 5 = 10 minutes in zone 3+
       expect(summary.moderateOrHigherDuration, const Duration(minutes: 10));
     });
   });
 
   // -------------------------------------------------------------------------
-  // Recovery HR drop
+  // Recovery HR drop — cooldown-gap gated
   // -------------------------------------------------------------------------
   group('recoveryHrDrop', () {
-    test('positive when HR decreased', () {
+    test('populated when last gap ≥ 55s, computed as peak − last', () {
       final readings = [
-        const HrReading(bpm: 160, elapsed: Duration.zero),
-        const HrReading(bpm: 130, elapsed: Duration(minutes: 2)),
-        const HrReading(bpm: 110, elapsed: Duration(minutes: 5)),
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 175, elapsed: Duration(seconds: 10)),
+        const HrReading(bpm: 160, elapsed: Duration(seconds: 20)),
+        const HrReading(bpm: 120, elapsed: Duration(seconds: 80)),
       ];
       final summary = calculateTimeInZones(readings, _config());
-      expect(summary.recoveryHrDrop, 50); // 160 - 110
+      expect(summary.recoveryHrDrop, 55);
     });
 
-    test('negative when HR increased (warm-up scenario)', () {
+    test('null when last gap < cooldownGap', () {
       final readings = [
-        const HrReading(bpm: 80, elapsed: Duration.zero),
-        const HrReading(bpm: 160, elapsed: Duration(minutes: 5)),
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 160, elapsed: Duration(seconds: 10)),
+        const HrReading(bpm: 150, elapsed: Duration(seconds: 15)),
       ];
       final summary = calculateTimeInZones(readings, _config());
-      expect(summary.recoveryHrDrop, -80);
+      expect(summary.recoveryHrDrop, isNull);
     });
 
-    test('zero when first and last are the same', () {
+    test('null during active monitoring with fast cadence', () {
       final readings = [
-        const HrReading(bpm: 120, elapsed: Duration.zero),
-        const HrReading(bpm: 130, elapsed: Duration(minutes: 3)),
-        const HrReading(bpm: 120, elapsed: Duration(minutes: 6)),
+        for (var i = 0; i < 10; i++)
+          HrReading(
+            bpm: 120 + i,
+            elapsed: Duration(seconds: i),
+          ),
       ];
       final summary = calculateTimeInZones(readings, _config());
-      expect(summary.recoveryHrDrop, 0);
+      expect(summary.recoveryHrDrop, isNull);
+    });
+
+    test('custom cooldownGap can widen or narrow the heuristic', () {
+      final readings = [
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 150, elapsed: Duration(seconds: 10)),
+        const HrReading(bpm: 110, elapsed: Duration(seconds: 40)),
+      ];
+      final defaultSummary = calculateTimeInZones(readings, _config());
+      expect(defaultSummary.recoveryHrDrop, isNull);
+
+      final loose = calculateTimeInZones(
+        readings,
+        _config(),
+        cooldownGap: const Duration(seconds: 20),
+      );
+      expect(loose.recoveryHrDrop, 60);
     });
   });
 
@@ -122,7 +143,7 @@ void main() {
     test('interval with zero duration is ignored', () {
       final readings = [
         const HrReading(bpm: 120, elapsed: Duration.zero),
-        const HrReading(bpm: 120, elapsed: Duration.zero), // duplicate timestamp
+        const HrReading(bpm: 120, elapsed: Duration.zero),
         const HrReading(bpm: 120, elapsed: Duration(minutes: 5)),
       ];
       final summary = calculateTimeInZones(readings, _config());

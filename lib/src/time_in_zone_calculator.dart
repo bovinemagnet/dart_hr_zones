@@ -21,6 +21,16 @@ class ZoneDuration {
       'ZoneDuration(zone: ${zone.zoneNumber}, duration: $duration)';
 }
 
+/// Constants used to classify reading cadence for recovery detection.
+abstract class ReadingCadence {
+  /// Default minimum gap (from the penultimate to the final reading) that
+  /// qualifies the final reading as a post-exercise "recovery" sample.
+  ///
+  /// 55 seconds leaves a little slack around the one-minute convention used
+  /// in sports-medicine recovery HR assessments.
+  static const Duration cooldownGap = Duration(seconds: 55);
+}
+
 /// The result of [calculateTimeInZones].
 class TimeInZoneSummary {
   /// Per-zone durations, in zone-number order (zone 1 first).
@@ -32,10 +42,13 @@ class TimeInZoneSummary {
   /// ≥ 150 minutes/week of moderate activity.
   final Duration moderateOrHigherDuration;
 
-  /// Heart rate at the first reading minus heart rate at the last reading,
-  /// expressed as a positive value when the heart rate decreased (recovery).
+  /// Recovery heart rate drop: peak session BPM minus the post-exercise
+  /// reading, when the caller has appended a post-session reading at least
+  /// [ReadingCadence.cooldownGap] after exercise stopped.
   ///
-  /// Returns `null` if fewer than two readings were provided.
+  /// Returns `null` when no such post-exercise reading is present (the
+  /// session is still in progress, or the caller chose not to append a
+  /// recovery sample).
   final int? recoveryHrDrop;
 
   /// Creates a [TimeInZoneSummary].
@@ -70,21 +83,21 @@ class TimeInZoneSummary {
 /// zone boundaries in [config].
 ///
 /// The duration for a zone segment is the difference in [HrReading.elapsed]
-/// between consecutive readings.  The zone used for each interval is
-/// determined by the *earlier* reading's BPM value.
+/// between consecutive readings. The zone used for each interval is
+/// determined by the *earlier* reading's BPM value. Intervals with
+/// non-positive duration are ignored.
 ///
-/// Returns a [TimeInZoneSummary] with:
-/// - per-zone accumulated durations,
-/// - total time in zone 3 or higher ([TimeInZoneSummary.moderateOrHigherDuration]),
-/// - the HR drop between the first and last reading
-///   ([TimeInZoneSummary.recoveryHrDrop]).
-///
-/// An empty or single-reading list returns zero durations and a `null` drop.
+/// [TimeInZoneSummary.recoveryHrDrop] is populated only when the last
+/// reading's [HrReading.elapsed] is at least [cooldownGap] after the
+/// previous reading's. That gap is the convention for a post-exercise
+/// recovery sample — during active monitoring the field stays `null`, so
+/// UIs don't have to invent ad-hoc rules to decide when to show it.
+/// The returned drop is `peakBpm − lastBpm`.
 TimeInZoneSummary calculateTimeInZones(
   List<HrReading> readings,
-  ZoneConfiguration config,
-) {
-  // Initialise an accumulator for every zone.
+  ZoneConfiguration config, {
+  Duration cooldownGap = ReadingCadence.cooldownGap,
+}) {
   final accumulators = <int, Duration>{
     for (final z in config.zones) z.zoneNumber: Duration.zero,
   };
@@ -97,8 +110,7 @@ TimeInZoneSummary calculateTimeInZones(
 
     final zone = currentZoneFromConfig(current.bpm, config);
     if (zone != null) {
-      accumulators[zone.zoneNumber] =
-          accumulators[zone.zoneNumber]! + interval;
+      accumulators[zone.zoneNumber] = accumulators[zone.zoneNumber]! + interval;
     }
   }
 
@@ -111,7 +123,6 @@ TimeInZoneSummary calculateTimeInZones(
       )
       .toList();
 
-  // Moderate-or-higher: zones 3, 4, 5.
   var moderateOrHigher = Duration.zero;
   for (final zd in zoneDurations) {
     if (zd.zone.zoneNumber >= 3) {
@@ -119,10 +130,16 @@ TimeInZoneSummary calculateTimeInZones(
     }
   }
 
-  // Recovery HR drop.
   int? recoveryHrDrop;
   if (readings.length >= 2) {
-    recoveryHrDrop = readings.first.bpm - readings.last.bpm;
+    final last = readings.last;
+    final penultimate = readings[readings.length - 2];
+    final gap = last.elapsed - penultimate.elapsed;
+    if (gap >= cooldownGap) {
+      final peakBpm =
+          readings.map((r) => r.bpm).reduce((a, b) => a > b ? a : b);
+      recoveryHrDrop = peakBpm - last.bpm;
+    }
   }
 
   return TimeInZoneSummary(

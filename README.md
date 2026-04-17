@@ -221,7 +221,7 @@ for (final zd in summary.zoneDurations) {
 
 ```yaml
 dependencies:
-  hr_zones: ^0.1.0
+  hr_zones: ^0.0.1
 ```
 
 ```bash

@@ -3,7 +3,7 @@ description: >-
   A pure-Dart heart rate zone calculator. Supports five calculation methods
   (custom, clinician cap, HRR/Karvonen, percent-of-measured-max,
   percent-of-estimated-max) with reliability grading and time-in-zone analysis.
-version: 0.1.0
+version: 0.0.1
 homepage: https://github.com/bovinemagnet/dart_hr_zones
 
 environment:

@@ -23,24 +23,23 @@ enum ZoneMethod {
   /// Requires [HealthProfile.measuredMaxHr].
   percentOfMeasuredMax,
 
-  /// Percentage-of-estimated-maximum method.
-  /// Estimates maximum HR as `220 − age`.
-  /// Requires [HealthProfile.age].
+  /// Percentage-of-estimated-maximum method. Estimates maximum HR from age
+  /// using [HealthProfile.maxHrFormula].
   percentOfEstimatedMax,
 }
 
 /// The reliability grade for the calculated zone configuration.
 enum ZoneReliability {
-  /// Based on measured data (measured max HR or explicit custom zones) without
-  /// any medical flags.
+  /// Based on measured data (measured max HR, explicit custom zones, or a
+  /// clinician-prescribed cap).
   high,
 
-  /// Based on estimated data (age-predicted max HR or clinician cap) without
-  /// any medical flags.
+  /// Based on estimated data (age-predicted max HR via the configured
+  /// formula) without any medical flags.
   medium,
 
-  /// Caution mode is active (beta-blocker or heart condition) or the input
-  /// data is incomplete.
+  /// Caution mode is active (beta-blocker or heart condition) and no
+  /// clinician cap is available to anchor the calculation.
   low,
 }
 
@@ -49,26 +48,53 @@ class CalculatedZone {
   /// Zone number (1 – 5).
   final int zoneNumber;
 
-  /// Human-readable label (e.g. "Zone 1 – Recovery").
+  /// Combined, UI-friendly label (e.g. `'Zone 1 – Recovery'`). When overridden
+  /// via the `labels` parameter of [calculateZones] this reflects the caller's
+  /// string verbatim.
   final String label;
+
+  /// Short effort descriptor (e.g. `'Easy'`, `'Moderate'`, `'Hard'`).
+  final String effortLabel;
+
+  /// Physiological descriptor (e.g. `'Recovery'`, `'Aerobic'`, `'Anaerobic'`,
+  /// `'VO₂ Max'`). For custom zones this is `'Custom'`.
+  final String descriptiveLabel;
 
   /// Lower bound in beats per minute (inclusive).
   final int lowerBound;
 
-  /// Upper bound in beats per minute (exclusive), or `null` for the top zone.
+  /// Upper bound in beats per minute (exclusive), or `null` for the top zone
+  /// (which extends to the configuration's [ZoneConfiguration.maxHr]).
   final int? upperBound;
 
   /// Zone colour as a packed `0xAARRGGBB` integer.
   final int color;
 
+  /// Lower bound as a fraction of the underlying max / reserve (0.0 – 1.0).
+  ///
+  /// Zero for [ZoneMethod.custom] zones (percentages are not applicable).
+  final double lowerPercent;
+
+  /// Upper bound as a fraction of the underlying max / reserve (0.0 – 1.0).
+  ///
+  /// Zero for [ZoneMethod.custom] zones (percentages are not applicable).
+  final double upperPercent;
+
   /// Creates a [CalculatedZone].
   const CalculatedZone({
     required this.zoneNumber,
     required this.label,
+    required this.effortLabel,
+    required this.descriptiveLabel,
     required this.lowerBound,
     this.upperBound,
     required this.color,
+    this.lowerPercent = 0,
+    this.upperPercent = 0,
   });
+
+  /// Combined "effort (descriptor)" display label, e.g. `'Moderate (Aerobic)'`.
+  String get displayLabel => '$effortLabel ($descriptiveLabel)';
 
   /// Returns `true` if [bpm] falls within this zone.
   bool containsBpm(int bpm) {
@@ -111,12 +137,17 @@ class ZoneConfiguration {
   /// May be measured, estimated, or a clinician cap depending on [method].
   final int maxHr;
 
+  /// Human-readable explanation of why this method and reliability were
+  /// selected. Suitable for tooltip / subtitle text in a UI.
+  final String reason;
+
   /// Creates a [ZoneConfiguration].
   const ZoneConfiguration({
     required this.zones,
     required this.method,
     required this.reliability,
     required this.maxHr,
+    required this.reason,
   });
 
   @override
@@ -126,13 +157,11 @@ class ZoneConfiguration {
 }
 
 // ---------------------------------------------------------------------------
-// Default zone bands and colours
+// Default zone bands, labels and colours
 // ---------------------------------------------------------------------------
 
-/// Default percentage bands for the five zones.
-///
-/// Each entry is `(lowerPercent, upperPercent)` where both values are in the
-/// range 0–100.  The upper value of zone 5 is implicitly 100.
+/// Default percentage bands for the five zones (`(lowerPercent, upperPercent)`
+/// as 0–100 values). Zone 5's upper is 100 (max HR).
 const List<(double, double)> _defaultBands = [
   (50.0, 60.0), // Zone 1 – Recovery
   (60.0, 70.0), // Zone 2 – Base Fitness
@@ -141,13 +170,31 @@ const List<(double, double)> _defaultBands = [
   (90.0, 100.0), // Zone 5 – VO₂ Max
 ];
 
-/// Default zone labels.
+/// Default combined zone labels.
 const List<String> _defaultLabels = [
   'Zone 1 – Recovery',
   'Zone 2 – Base Fitness',
   'Zone 3 – Aerobic',
   'Zone 4 – Lactate Threshold',
-  'Zone 5 – VO₂ Max',
+  'Zone 5 – VO\u2082 Max',
+];
+
+/// Default short effort descriptors.
+const List<String> _defaultEffortLabels = [
+  'Easy',
+  'Light',
+  'Moderate',
+  'Hard',
+  'Very Hard',
+];
+
+/// Default physiological descriptors.
+const List<String> _defaultDescriptiveLabels = [
+  'Recovery',
+  'Aerobic',
+  'Aerobic',
+  'Anaerobic',
+  'VO\u2082 Max',
 ];
 
 /// Default zone colours (`0xAARRGGBB`).
@@ -168,71 +215,90 @@ const List<int> _defaultColors = [
 /// Attempts each method in priority order and returns the first that succeeds:
 ///
 /// 1. [ZoneMethod.custom] — if [HealthProfile.customZones] is set.
-/// 2. [ZoneMethod.clinicianCap] — if [HealthProfile.clinicianMaxHr] is set and
-///    caution mode is not active.
-/// 3. [ZoneMethod.hrrKarvonen] — if both a max HR and
+/// 2. [ZoneMethod.clinicianCap] — if [HealthProfile.clinicianMaxHr] is set.
+///    Always wins over the fallback chain; reliability is `high` even in
+///    caution mode because the clinician's guidance is authoritative.
+/// 3. [ZoneMethod.hrrKarvonen] — if both a max HR (measured or estimated) and
 ///    [HealthProfile.restingHr] are available.
 /// 4. [ZoneMethod.percentOfMeasuredMax] — if [HealthProfile.measuredMaxHr]
 ///    is set.
-/// 5. [ZoneMethod.percentOfEstimatedMax] — if [HealthProfile.age] is set.
+/// 5. [ZoneMethod.percentOfEstimatedMax] — using
+///    [HealthProfile.maxHrFormula] (default Tanaka `208 − 0.7 × age`).
 ///
 /// Returns `null` if none of the methods can produce zones from the available
 /// data.
-///
-/// **Optional overrides**
-///
-/// - [bands]: five `(lowerPercent, upperPercent)` tuples overriding the
-///   default zone widths.
-/// - [labels]: five zone label strings.
-/// - [colors]: five `0xAARRGGBB` colour integers.
 ZoneConfiguration? calculateZones(
   HealthProfile profile, {
   List<(double, double)>? bands,
   List<String>? labels,
+  List<String>? effortLabels,
+  List<String>? descriptiveLabels,
   List<int>? colors,
 }) {
   final effectiveBands = bands ?? _defaultBands;
   final effectiveLabels = labels ?? _defaultLabels;
+  final effectiveEfforts = effortLabels ?? _defaultEffortLabels;
+  final effectiveDescs = descriptiveLabels ?? _defaultDescriptiveLabels;
   final effectiveColors = colors ?? _defaultColors;
 
   assert(effectiveBands.length == 5, 'bands must have exactly 5 entries');
   assert(effectiveLabels.length == 5, 'labels must have exactly 5 entries');
+  assert(
+    effectiveEfforts.length == 5,
+    'effortLabels must have exactly 5 entries',
+  );
+  assert(
+    effectiveDescs.length == 5,
+    'descriptiveLabels must have exactly 5 entries',
+  );
   assert(effectiveColors.length == 5, 'colors must have exactly 5 entries');
 
   // 1. Custom zones
   final custom = profile.customZones;
   if (custom != null) {
-    return _customZones(custom, effectiveLabels, effectiveColors);
+    return _customZones(
+      custom,
+      effectiveLabels,
+      effectiveEfforts,
+      effectiveColors,
+    );
   }
 
-  // 2. Clinician cap (only when caution mode is not active)
+  // 2. Clinician cap — authoritative. Overrides caution mode; reliability is
+  // high because the clinician specifically prescribed this cap.
   final clinicianMax = profile.clinicianMaxHr;
-  if (clinicianMax != null && !profile.isCautionMode) {
+  if (clinicianMax != null) {
     return _percentOfMaxZones(
       maxHr: clinicianMax,
       method: ZoneMethod.clinicianCap,
-      reliability: ZoneReliability.medium,
+      reliability: ZoneReliability.high,
+      reason: 'Using clinician-provided maximum heart rate',
       bands: effectiveBands,
       labels: effectiveLabels,
+      efforts: effectiveEfforts,
+      descs: effectiveDescs,
       colors: effectiveColors,
     );
   }
 
   // Resolve best available max HR for Karvonen and percentage methods.
-  // In caution mode cap at clinicianMaxHr if present.
-  final int? resolvedMax = _resolveMaxHr(profile);
+  final resolvedMax = _resolveMaxHr(profile);
 
   // 3. HRR / Karvonen
   final restingHr = profile.restingHr;
   if (resolvedMax != null && restingHr != null) {
+    final reliability = profile.isCautionMode
+        ? ZoneReliability.low
+        : _maxHrReliability(profile, resolvedMax);
     return _hrrZones(
       maxHr: resolvedMax,
       restingHr: restingHr,
-      reliability: profile.isCautionMode
-          ? ZoneReliability.low
-          : _maxHrReliability(profile, resolvedMax),
+      reliability: reliability,
+      reason: _reasonFor(profile, ZoneMethod.hrrKarvonen, reliability),
       bands: effectiveBands,
       labels: effectiveLabels,
+      efforts: effectiveEfforts,
+      descs: effectiveDescs,
       colors: effectiveColors,
     );
   }
@@ -240,38 +306,36 @@ ZoneConfiguration? calculateZones(
   // 4. Percent of measured max
   final measuredMax = profile.measuredMaxHr;
   if (measuredMax != null) {
-    final capped =
-        (clinicianMax != null && profile.isCautionMode && measuredMax > clinicianMax)
-            ? clinicianMax
-            : measuredMax;
+    final reliability =
+        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.high;
     return _percentOfMaxZones(
-      maxHr: capped,
+      maxHr: measuredMax,
       method: ZoneMethod.percentOfMeasuredMax,
-      reliability: profile.isCautionMode
-          ? ZoneReliability.low
-          : ZoneReliability.high,
+      reliability: reliability,
+      reason: _reasonFor(profile, ZoneMethod.percentOfMeasuredMax, reliability),
       bands: effectiveBands,
       labels: effectiveLabels,
+      efforts: effectiveEfforts,
+      descs: effectiveDescs,
       colors: effectiveColors,
     );
   }
 
-  // 5. Percent of estimated max (220 – age)
-  final age = profile.age;
-  if (age != null) {
-    final estimated = 220 - age;
-    final capped =
-        (clinicianMax != null && profile.isCautionMode && estimated > clinicianMax)
-            ? clinicianMax
-            : estimated;
+  // 5. Percent of estimated max (via profile.maxHrFormula)
+  final estimated = profile.estimatedMaxHr;
+  if (estimated != null) {
+    final reliability =
+        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.medium;
     return _percentOfMaxZones(
-      maxHr: capped,
+      maxHr: estimated,
       method: ZoneMethod.percentOfEstimatedMax,
-      reliability: profile.isCautionMode
-          ? ZoneReliability.low
-          : ZoneReliability.medium,
+      reliability: reliability,
+      reason:
+          _reasonFor(profile, ZoneMethod.percentOfEstimatedMax, reliability),
       bands: effectiveBands,
       labels: effectiveLabels,
+      efforts: effectiveEfforts,
+      descs: effectiveDescs,
       colors: effectiveColors,
     );
   }
@@ -292,26 +356,15 @@ CalculatedZone? currentZoneFromConfig(int bpm, ZoneConfiguration config) {
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/// Resolves the best max HR available (measured takes priority over estimated).
-/// In caution mode, caps at clinicianMaxHr if it is lower.
+/// Resolves the best max HR available for Karvonen / percentage methods.
+/// Measured max takes priority; otherwise falls back to the configured
+/// age-based formula. Returns `null` when neither is available.
 int? _resolveMaxHr(HealthProfile profile) {
-  int? max;
-  if (profile.measuredMaxHr != null) {
-    max = profile.measuredMaxHr;
-  } else if (profile.age != null) {
-    max = 220 - profile.age!;
-  }
-
-  if (max == null) return null;
-
-  final cap = profile.clinicianMaxHr;
-  if (cap != null && profile.isCautionMode && max > cap) {
-    return cap;
-  }
-  return max;
+  if (profile.measuredMaxHr != null) return profile.measuredMaxHr;
+  return profile.estimatedMaxHr;
 }
 
-/// Derives reliability from the type of max HR available.
+/// Derives reliability from the type of max HR available (non-caution).
 ZoneReliability _maxHrReliability(HealthProfile profile, int resolvedMax) {
   if (profile.measuredMaxHr != null && resolvedMax == profile.measuredMaxHr) {
     return ZoneReliability.high;
@@ -319,10 +372,36 @@ ZoneReliability _maxHrReliability(HealthProfile profile, int resolvedMax) {
   return ZoneReliability.medium;
 }
 
-/// Builds a [ZoneConfiguration] from explicit custom zone boundaries.
+/// Builds the reason string for non-custom / non-clinician methods.
+String _reasonFor(
+  HealthProfile profile,
+  ZoneMethod method,
+  ZoneReliability reliability,
+) {
+  final baseReason = switch (method) {
+    ZoneMethod.hrrKarvonen => 'Using heart rate reserve (Karvonen) method',
+    ZoneMethod.percentOfMeasuredMax => 'Using measured maximum heart rate',
+    ZoneMethod.percentOfEstimatedMax =>
+      'Using age-estimated maximum heart rate '
+          '(${profile.maxHrFormula.displayName})',
+    ZoneMethod.custom => 'Using custom zone boundaries',
+    ZoneMethod.clinicianCap => 'Using clinician-provided maximum heart rate',
+  };
+
+  if (reliability != ZoneReliability.low) return baseReason;
+
+  final flags = <String>[];
+  if (profile.betaBlocker) flags.add('beta blocker medication');
+  if (profile.heartCondition) flags.add('heart condition');
+  final flagsText = flags.isEmpty ? '' : ' (${flags.join(' and ')} reported)';
+  return 'Caution mode$flagsText. $baseReason. '
+      'Consider setting a clinician-provided maximum heart rate.';
+}
+
 ZoneConfiguration _customZones(
   CustomZoneBoundary custom,
   List<String> labels,
+  List<String> efforts,
   List<int> colors,
 ) {
   final lowers = [
@@ -332,13 +411,18 @@ ZoneConfiguration _customZones(
     custom.zone4Lower,
     custom.zone5Lower,
   ];
+  final customLabels = custom.labels;
 
   final zones = <CalculatedZone>[];
   for (var i = 0; i < 5; i++) {
+    final effort = customLabels != null ? customLabels[i] : efforts[i];
+    final label = customLabels != null ? customLabels[i] : labels[i];
     zones.add(
       CalculatedZone(
         zoneNumber: i + 1,
-        label: labels[i],
+        label: label,
+        effortLabel: effort,
+        descriptiveLabel: 'Custom',
         lowerBound: lowers[i],
         upperBound: i < 4 ? lowers[i + 1] : null,
         color: colors[i],
@@ -351,16 +435,19 @@ ZoneConfiguration _customZones(
     method: ZoneMethod.custom,
     reliability: ZoneReliability.high,
     maxHr: custom.zone5Lower,
+    reason: 'Using custom zone boundaries',
   );
 }
 
-/// Builds a [ZoneConfiguration] using a percentage-of-max-HR approach.
 ZoneConfiguration _percentOfMaxZones({
   required int maxHr,
   required ZoneMethod method,
   required ZoneReliability reliability,
+  required String reason,
   required List<(double, double)> bands,
   required List<String> labels,
+  required List<String> efforts,
+  required List<String> descs,
   required List<int> colors,
 }) {
   final zones = <CalculatedZone>[];
@@ -372,9 +459,13 @@ ZoneConfiguration _percentOfMaxZones({
       CalculatedZone(
         zoneNumber: i + 1,
         label: labels[i],
+        effortLabel: efforts[i],
+        descriptiveLabel: descs[i],
         lowerBound: lowerBpm,
         upperBound: upperBpm,
         color: colors[i],
+        lowerPercent: lower / 100,
+        upperPercent: upper / 100,
       ),
     );
   }
@@ -383,18 +474,19 @@ ZoneConfiguration _percentOfMaxZones({
     method: method,
     reliability: reliability,
     maxHr: maxHr,
+    reason: reason,
   );
 }
 
-/// Builds a [ZoneConfiguration] using the HRR (Karvonen) method.
-///
-/// `targetHR = (maxHR − restingHR) × intensity + restingHR`
 ZoneConfiguration _hrrZones({
   required int maxHr,
   required int restingHr,
   required ZoneReliability reliability,
+  required String reason,
   required List<(double, double)> bands,
   required List<String> labels,
+  required List<String> efforts,
+  required List<String> descs,
   required List<int> colors,
 }) {
   final hrr = maxHr - restingHr;
@@ -407,9 +499,13 @@ ZoneConfiguration _hrrZones({
       CalculatedZone(
         zoneNumber: i + 1,
         label: labels[i],
+        effortLabel: efforts[i],
+        descriptiveLabel: descs[i],
         lowerBound: lowerBpm,
         upperBound: upperBpm,
         color: colors[i],
+        lowerPercent: lower / 100,
+        upperPercent: upper / 100,
       ),
     );
   }
@@ -418,5 +514,6 @@ ZoneConfiguration _hrrZones({
     method: ZoneMethod.hrrKarvonen,
     reliability: reliability,
     maxHr: maxHr,
+    reason: reason,
   );
 }

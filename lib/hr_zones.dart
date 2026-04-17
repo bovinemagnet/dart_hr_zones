@@ -20,12 +20,13 @@
 ///   }
 /// }
 /// ```
-library hr_zones;
+library;
 
-export 'src/health_profile.dart' show HealthProfile, CustomZoneBoundary;
+export 'src/health_profile.dart'
+    show CustomZoneBoundary, HealthProfile, MaxHrFormula, MaxHrFormulaApply;
 export 'src/hr_reading.dart' show HrReading;
 export 'src/time_in_zone_calculator.dart'
-    show TimeInZoneSummary, ZoneDuration, calculateTimeInZones;
+    show ReadingCadence, TimeInZoneSummary, ZoneDuration, calculateTimeInZones;
 export 'src/zone_calculator.dart'
     show
         CalculatedZone,
