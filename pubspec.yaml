@@ -1,0 +1,14 @@
+name: hr_zones
+description: >-
+  A pure-Dart heart rate zone calculator. Supports five calculation methods
+  (custom, clinician cap, HRR/Karvonen, percent-of-measured-max,
+  percent-of-estimated-max) with reliability grading and time-in-zone analysis.
+version: 0.1.0
+homepage: https://github.com/bovinemagnet/dart_hr_zones
+
+environment:
+  sdk: ^3.4.0
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0
