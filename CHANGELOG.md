@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `calculateZones` now skips the HRR/Karvonen method when `restingHr` is not
+  below the resolved max HR (non-positive heart-rate reserve), falling
+  through to the percentage methods instead of producing inverted zones.
+- `calculateZones` now throws `ArgumentError` when `CustomZoneBoundary`
+  lower bounds are not strictly increasing, instead of silently building
+  inverted zones that never match any reading.
+- Custom zone `labels` are now combined into the UI label as
+  `'Zone N – <label>'` (previously the bare label replaced it), and an
+  explicit `labels:` argument to `calculateZones` now takes precedence over
+  `CustomZoneBoundary.labels` for the combined label.
+- `ZoneConfiguration.zones` and `TimeInZoneSummary.zoneDurations` are now
+  unmodifiable lists.
+
+### Documentation
+
+- Documented `ZoneConfiguration.maxHr` semantics for custom zones
+  (`zone5Lower`), the dual interpretation of the `bands` parameter
+  (percent-of-max vs percent-of-LTHR), and the assumed-valid input contract
+  on `HealthProfile` and `MaxHrFormula.apply`.
+
 ## [0.0.3] - 2026-04-17
 
 ### Added

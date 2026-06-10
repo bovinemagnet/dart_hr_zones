@@ -71,7 +71,92 @@ void main() {
       );
       final customConfig = calculateZones(profile)!;
       expect(customConfig.zones.first.effortLabel, 'Marathon');
-      expect(customConfig.zones.first.label, 'Marathon');
+      expect(customConfig.zones.first.label, 'Zone 1 – Marathon');
+      expect(customConfig.zones[2].label, 'Zone 3 – Tempo');
+    });
+
+    test('explicit labels parameter wins over CustomZoneBoundary.labels', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+          labels: ['Marathon', 'Endurance', 'Tempo', 'Threshold', 'VO₂'],
+        ),
+      );
+      final customConfig = calculateZones(
+        profile,
+        labels: const ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
+      )!;
+      expect(customConfig.zones.first.label, 'Z1');
+      expect(customConfig.zones.first.effortLabel, 'Marathon');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Custom boundary validation — lowers must be strictly increasing
+  // -------------------------------------------------------------------------
+  group('custom boundary validation', () {
+    test('non-monotonic boundaries throw ArgumentError', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 171,
+          zone2Lower: 152,
+          zone3Lower: 133,
+          zone4Lower: 114,
+          zone5Lower: 95,
+        ),
+      );
+      expect(() => calculateZones(profile), throwsArgumentError);
+    });
+
+    test('equal adjacent boundaries throw ArgumentError', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 114,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+      );
+      expect(() => calculateZones(profile), throwsArgumentError);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Karvonen requires restingHr < maxHr — otherwise skip to the next method
+  // -------------------------------------------------------------------------
+  group('Karvonen with non-positive heart rate reserve', () {
+    test('restingHr above maxHr skips Karvonen, uses percent of measured', () {
+      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 130);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.percentOfMeasuredMax);
+      // Zones must still be well-formed (lower < upper).
+      for (final z in config.zones) {
+        if (z.upperBound != null) {
+          expect(z.lowerBound, lessThan(z.upperBound!));
+        }
+      }
+    });
+
+    test('restingHr equal to maxHr also skips Karvonen', () {
+      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 120);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.percentOfMeasuredMax);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ZoneConfiguration.zones cannot be mutated by callers
+  // -------------------------------------------------------------------------
+  group('ZoneConfiguration immutability', () {
+    test('zones list is unmodifiable', () {
+      const profile = HealthProfile(age: 40);
+      final config = calculateZones(profile)!;
+      expect(() => config.zones.clear(), throwsUnsupportedError);
     });
   });
 

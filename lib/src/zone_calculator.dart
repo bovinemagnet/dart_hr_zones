@@ -55,7 +55,8 @@ class CalculatedZone {
 
   /// Combined, UI-friendly label (e.g. `'Zone 1 – Recovery'`). When overridden
   /// via the `labels` parameter of [calculateZones] this reflects the caller's
-  /// string verbatim.
+  /// string verbatim. For custom zones with [CustomZoneBoundary.labels] set
+  /// (and no explicit `labels` override) this is `'Zone N – <custom label>'`.
   final String label;
 
   /// Short effort descriptor (e.g. `'Easy'`, `'Moderate'`, `'Hard'`).
@@ -129,6 +130,8 @@ class CalculatedZone {
 /// The result of a zone calculation, containing all five zones and metadata.
 class ZoneConfiguration {
   /// The five calculated zones, ordered from zone 1 to zone 5.
+  ///
+  /// Configurations produced by [calculateZones] hold an unmodifiable list.
   final List<CalculatedZone> zones;
 
   /// The calculation method that was used.
@@ -143,8 +146,11 @@ class ZoneConfiguration {
   /// [ZoneMethod.hrrKarvonen], [ZoneMethod.percentOfMeasuredMax],
   /// [ZoneMethod.percentOfEstimatedMax]) this is the maximum heart rate.
   /// For [ZoneMethod.lthrFriel] this is the lactate-threshold heart rate used
-  /// as the band anchor. The `method` field disambiguates which semantic
-  /// applies. [CalculatedZone.lowerPercent] / [CalculatedZone.upperPercent]
+  /// as the band anchor. For [ZoneMethod.custom] it is
+  /// [CustomZoneBoundary.zone5Lower] — the lower bound of the top zone, not a
+  /// true maximum, since custom configurations carry no explicit max HR.
+  /// The `method` field disambiguates which semantic applies.
+  /// [CalculatedZone.lowerPercent] / [CalculatedZone.upperPercent]
   /// remain fractions of this value.
   final int maxHr;
 
@@ -236,7 +242,9 @@ const List<int> _defaultColors = [
 ///
 /// Attempts each method in priority order and returns the first that succeeds:
 ///
-/// 1. [ZoneMethod.custom] — if [HealthProfile.customZones] is set.
+/// 1. [ZoneMethod.custom] — if [HealthProfile.customZones] is set. Throws
+///    [ArgumentError] when the custom lower bounds are not strictly
+///    increasing.
 /// 2. [ZoneMethod.clinicianCap] — if [HealthProfile.clinicianMaxHr] is set.
 ///    Always wins over the fallback chain; reliability is `high` even in
 ///    caution mode because the clinician's guidance is authoritative.
@@ -245,7 +253,9 @@ const List<int> _defaultColors = [
 ///    more accurately than an HRR/Karvonen fallback that may use an
 ///    age-estimated max.
 /// 4. [ZoneMethod.hrrKarvonen] — if both a max HR (measured or estimated) and
-///    [HealthProfile.restingHr] are available.
+///    [HealthProfile.restingHr] are available, and the resting HR is below
+///    the max (a positive heart-rate reserve). Otherwise the chain falls
+///    through to the percentage methods.
 /// 5. [ZoneMethod.percentOfMeasuredMax] — if [HealthProfile.measuredMaxHr]
 ///    is set.
 /// 6. [ZoneMethod.percentOfEstimatedMax] — using
@@ -254,6 +264,13 @@ const List<int> _defaultColors = [
 /// For max-HR-based methods, [bands] entries are fractions of the resolved
 /// max HR. For [ZoneMethod.lthrFriel] they are fractions of LTHR; when
 /// omitted, Friel's default 5-zone bands are used.
+///
+/// **Warning:** the same [bands] list is interpreted against whichever anchor
+/// the priority chain selects. Bands tuned for percent-of-max semantics
+/// (defaults 50–100 %) will be silently re-anchored on LTHR (defaults
+/// 0–110 %) if the profile has [HealthProfile.lactateThresholdHr] set. When
+/// passing custom bands, make sure they match the method the profile will
+/// select.
 ///
 /// Returns `null` if none of the methods can produce zones from the available
 /// data.
@@ -289,7 +306,7 @@ ZoneConfiguration? calculateZones(
   if (custom != null) {
     return _customZones(
       custom,
-      effectiveLabels,
+      labels,
       effectiveEfforts,
       effectiveColors,
     );
@@ -319,8 +336,9 @@ ZoneConfiguration? calculateZones(
   if (lthr != null) {
     final reliability =
         profile.isCautionMode ? ZoneReliability.low : ZoneReliability.high;
-    return _lthrFrielZones(
-      lthr: lthr,
+    return _percentOfMaxZones(
+      maxHr: lthr,
+      method: ZoneMethod.lthrFriel,
       reliability: reliability,
       reason: _reasonFor(profile, ZoneMethod.lthrFriel, reliability),
       bands: effectiveFrielBands,
@@ -334,9 +352,10 @@ ZoneConfiguration? calculateZones(
   // Resolve best available max HR for Karvonen and percentage methods.
   final resolvedMax = _resolveMaxHr(profile);
 
-  // 4. HRR / Karvonen
+  // 4. HRR / Karvonen — needs a positive heart-rate reserve; otherwise the
+  // zones would come out inverted, so fall through to the percentage methods.
   final restingHr = profile.restingHr;
-  if (resolvedMax != null && restingHr != null) {
+  if (resolvedMax != null && restingHr != null && restingHr < resolvedMax) {
     final reliability = profile.isCautionMode
         ? ZoneReliability.low
         : _maxHrReliability(profile, resolvedMax);
@@ -451,7 +470,7 @@ String _reasonFor(
 
 ZoneConfiguration _customZones(
   CustomZoneBoundary custom,
-  List<String> labels,
+  List<String>? explicitLabels,
   List<String> efforts,
   List<int> colors,
 ) {
@@ -462,12 +481,27 @@ ZoneConfiguration _customZones(
     custom.zone4Lower,
     custom.zone5Lower,
   ];
+  for (var i = 0; i < 4; i++) {
+    if (lowers[i] >= lowers[i + 1]) {
+      throw ArgumentError.value(
+        custom,
+        'customZones',
+        'zone lower bounds must be strictly increasing, but '
+            'zone ${i + 1} (${lowers[i]} bpm) >= '
+            'zone ${i + 2} (${lowers[i + 1]} bpm)',
+      );
+    }
+  }
   final customLabels = custom.labels;
 
   final zones = <CalculatedZone>[];
   for (var i = 0; i < 5; i++) {
     final effort = customLabels != null ? customLabels[i] : efforts[i];
-    final label = customLabels != null ? customLabels[i] : labels[i];
+    final label = explicitLabels != null
+        ? explicitLabels[i]
+        : customLabels != null
+            ? 'Zone ${i + 1} – ${customLabels[i]}'
+            : _defaultLabels[i];
     zones.add(
       CalculatedZone(
         zoneNumber: i + 1,
@@ -482,7 +516,7 @@ ZoneConfiguration _customZones(
   }
 
   return ZoneConfiguration(
-    zones: zones,
+    zones: List.unmodifiable(zones),
     method: ZoneMethod.custom,
     reliability: ZoneReliability.high,
     maxHr: custom.zone5Lower,
@@ -490,6 +524,10 @@ ZoneConfiguration _customZones(
   );
 }
 
+/// Builds zones by applying percentage [bands] to an anchor heart rate.
+///
+/// [maxHr] is the anchor: the resolved maximum heart rate for the max-HR
+/// methods, or the lactate threshold heart rate for [ZoneMethod.lthrFriel].
 ZoneConfiguration _percentOfMaxZones({
   required int maxHr,
   required ZoneMethod method,
@@ -521,7 +559,7 @@ ZoneConfiguration _percentOfMaxZones({
     );
   }
   return ZoneConfiguration(
-    zones: zones,
+    zones: List.unmodifiable(zones),
     method: method,
     reliability: reliability,
     maxHr: maxHr,
@@ -561,48 +599,10 @@ ZoneConfiguration _hrrZones({
     );
   }
   return ZoneConfiguration(
-    zones: zones,
+    zones: List.unmodifiable(zones),
     method: ZoneMethod.hrrKarvonen,
     reliability: reliability,
     maxHr: maxHr,
-    reason: reason,
-  );
-}
-
-ZoneConfiguration _lthrFrielZones({
-  required int lthr,
-  required ZoneReliability reliability,
-  required String reason,
-  required List<(double, double)> bands,
-  required List<String> labels,
-  required List<String> efforts,
-  required List<String> descs,
-  required List<int> colors,
-}) {
-  final zones = <CalculatedZone>[];
-  for (var i = 0; i < 5; i++) {
-    final (lower, upper) = bands[i];
-    final lowerBpm = (lthr * lower / 100).round();
-    final upperBpm = i < 4 ? (lthr * upper / 100).round() : null;
-    zones.add(
-      CalculatedZone(
-        zoneNumber: i + 1,
-        label: labels[i],
-        effortLabel: efforts[i],
-        descriptiveLabel: descs[i],
-        lowerBound: lowerBpm,
-        upperBound: upperBpm,
-        color: colors[i],
-        lowerPercent: lower / 100,
-        upperPercent: upper / 100,
-      ),
-    );
-  }
-  return ZoneConfiguration(
-    zones: zones,
-    method: ZoneMethod.lthrFriel,
-    reliability: reliability,
-    maxHr: lthr,
     reason: reason,
   );
 }

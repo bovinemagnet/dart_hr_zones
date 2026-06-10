@@ -94,9 +94,7 @@ double? calculateBanisterTrimp(
     final interval = next.elapsed - current.elapsed;
     if (interval <= Duration.zero) continue;
 
-    var hrrFraction = (current.bpm - restingHr) / range;
-    if (hrrFraction < 0) hrrFraction = 0;
-    if (hrrFraction > 1) hrrFraction = 1;
+    final hrrFraction = ((current.bpm - restingHr) / range).clamp(0.0, 1.0);
 
     final minutes = interval.inMicroseconds / Duration.microsecondsPerMinute;
     final weighting = coefficients.a * exp(coefficients.b * hrrFraction);

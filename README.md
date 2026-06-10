@@ -99,7 +99,9 @@ sufficient data:
 3. **LTHR (Friel)** — if `lactateThresholdHr` is set. A measured threshold
    value is a stronger anchor than the HRR fallback when one is available.
 4. **HRR / Karvonen** — if a max HR (measured or age-estimated) **and**
-   `restingHr` are available.
+   `restingHr` are available, and the resting HR is below the max (a
+   positive heart-rate reserve); otherwise the chain falls through to the
+   percentage methods.
 5. **Percent of measured max** — if `measuredMaxHr` is set.
 6. **Percent of estimated max** — using `HealthProfile.maxHrFormula` (Tanaka
    by default).
@@ -109,7 +111,8 @@ sufficient data:
 #### Custom zones
 
 Explicit BPM lower bounds for each zone, with optional per-zone effort labels.
-Reliability: **high**.
+Reliability: **high**. The lower bounds must be strictly increasing;
+`calculateZones` throws `ArgumentError` otherwise.
 
 ```dart
 calculateZones(HealthProfile(
@@ -120,6 +123,10 @@ calculateZones(HealthProfile(
   ),
 ));
 ```
+
+The custom `labels` become the zones' `effortLabel`s and are combined into
+the UI labels (`'Zone 1 – Marathon'`, …) unless an explicit `labels:`
+override is passed to `calculateZones`.
 
 #### Clinician cap
 
@@ -326,7 +333,7 @@ final banister = calculateBanisterTrimp(
 
 - `HealthProfile` — inputs: age, restingHr, measuredMaxHr, clinicianMaxHr, lactateThresholdHr, betaBlocker, heartCondition, customZones, maxHrFormula. Getters: `isCautionMode`, `estimatedMaxHr`. `copyWith` with `clear…` flags.
 - `CustomZoneBoundary` — explicit zone1–5 lower bounds plus optional `labels`.
-- `ZoneConfiguration` — `zones`, `method`, `reliability`, `maxHr` (holds LTHR for the LTHR method), `reason`.
+- `ZoneConfiguration` — `zones`, `method`, `reliability`, `maxHr` (holds LTHR for the LTHR method, and `zone5Lower` for custom zones), `reason`.
 - `CalculatedZone` — `zoneNumber`, `label`, `effortLabel`, `descriptiveLabel`, `displayLabel`, `lowerBound`, nullable `upperBound`, `color`, `lowerPercent`, `upperPercent`; `containsBpm` helper.
 - `HrReading` — `bpm` + `elapsed` with equality and `toString`.
 - `TimeInZoneSummary` — `zoneDurations`, `moderateOrHigherDuration`, `recoveryHrDrop`; `durationInZone(int)` helper.

@@ -34,6 +34,8 @@ abstract class ReadingCadence {
 /// The result of [calculateTimeInZones].
 class TimeInZoneSummary {
   /// Per-zone durations, in zone-number order (zone 1 first).
+  ///
+  /// Summaries produced by [calculateTimeInZones] hold an unmodifiable list.
   final List<ZoneDuration> zoneDurations;
 
   /// Total time spent in zone 3 or higher ("moderate-or-higher").
@@ -143,7 +145,7 @@ TimeInZoneSummary calculateTimeInZones(
   }
 
   return TimeInZoneSummary(
-    zoneDurations: zoneDurations,
+    zoneDurations: List.unmodifiable(zoneDurations),
     moderateOrHigherDuration: moderateOrHigher,
     recoveryHrDrop: recoveryHrDrop,
   );

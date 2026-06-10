@@ -266,4 +266,20 @@ void main() {
       expect(zone1.toString(), contains('0:03:00'));
     });
   });
+
+  // -------------------------------------------------------------------------
+  // TimeInZoneSummary.zoneDurations cannot be mutated by callers
+  // -------------------------------------------------------------------------
+  group('TimeInZoneSummary immutability', () {
+    test('zoneDurations list is unmodifiable', () {
+      final summary = calculateTimeInZones(
+        [
+          const HrReading(bpm: 95, elapsed: Duration.zero),
+          const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+        ],
+        _config(),
+      );
+      expect(() => summary.zoneDurations.clear(), throwsUnsupportedError);
+    });
+  });
 }

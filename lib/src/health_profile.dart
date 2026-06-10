@@ -41,6 +41,9 @@ enum MaxHrFormula {
 /// Extension exposing the numeric evaluation of each [MaxHrFormula].
 extension MaxHrFormulaApply on MaxHrFormula {
   /// Computes the estimated maximum heart rate for [age] in years.
+  ///
+  /// [age] is assumed to be a plausible positive human age; no validation is
+  /// performed, and implausible inputs produce implausible estimates.
   int apply(int age) {
     switch (this) {
       case MaxHrFormula.tanaka:
@@ -81,11 +84,15 @@ extension MaxHrFormulaApply on MaxHrFormula {
 ///
 /// Each zone is defined by its lower bound (inclusive) in beats per minute.
 /// The upper bound of a zone is implicitly the lower bound of the next zone
-/// (or [zone5Lower] for zone 5, which extends to max HR).
+/// (or [zone5Lower] for zone 5, which extends to max HR). The lower bounds
+/// must be strictly increasing; `calculateZones` throws [ArgumentError]
+/// otherwise.
 ///
 /// Optionally, [labels] supplies a human-readable effort label for each of
 /// the five zones (e.g. `['Marathon', 'Endurance', 'Tempo', 'Threshold',
-/// 'VO₂']`). When `null`, the default effort labels are used.
+/// 'VO₂']`). When `null`, the default effort labels are used. Each label is
+/// also combined into the zone's UI label as `'Zone N – <label>'` unless the
+/// caller passes an explicit `labels` override to `calculateZones`.
 class CustomZoneBoundary {
   /// Lower bound of zone 1 in beats per minute (inclusive).
   final int zone1Lower;
@@ -161,6 +168,9 @@ class CustomZoneBoundary {
 ///
 /// Provide as many fields as are known; the calculator uses a priority chain
 /// to select the most reliable method available.
+///
+/// Values are assumed to be physiologically plausible (positive age,
+/// realistic heart rates); the profile performs no validation itself.
 class HealthProfile {
   /// Age in years. Used to estimate maximum heart rate via [maxHrFormula]
   /// when no measured maximum is available.
