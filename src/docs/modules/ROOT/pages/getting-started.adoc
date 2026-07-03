@@ -23,7 +23,7 @@ Or add it manually to `pubspec.yaml` and run `dart pub get`:
 [source,yaml]
 ----
 dependencies:
-  hr_zones: ^0.0.2
+  hr_zones: ^0.0.3
 ----
 
 [source,bash]
@@ -75,7 +75,7 @@ Expected output (age 35, Tanaka formula estimates max HR as 184 bpm):
 Method:      percentOfEstimatedMax
 Reliability: medium
 Max HR used: 184 bpm
-Reason:      Using percentage of estimated maximum heart rate (Tanaka).
+Reason:      Using age-estimated maximum heart rate (Tanaka (208 − 0.7 × age))
 Zone 1 – Recovery (Easy): 92–110 bpm
 Zone 2 – Base Fitness (Light): 110–129 bpm
 Zone 3 – Aerobic (Moderate): 129–147 bpm

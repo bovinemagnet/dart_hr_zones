@@ -7,11 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `HrReading.isRecoverySample` flag. When set on the final reading,
+  `calculateTimeInZones` excludes the preceding cooldown interval from the
+  per-zone totals and populates `recoveryHrDrop` deterministically, avoiding
+  the misclassification of a late sensor dropout as a recovery measurement.
+- `TimeInZoneSummary.belowZone1Duration` surfaces the time whose starting
+  reading fell below zone 1, which was previously discarded without being
+  reported, so a caller can account for the whole session.
+
 ### Changed
 
-- `calculateZones` now skips the HRR/Karvonen method when `restingHr` is not
-  below the resolved max HR (non-positive heart-rate reserve), falling
-  through to the percentage methods instead of producing inverted zones.
+- **Breaking:** raised the minimum Dart SDK to `^3.8.0` (was `^3.4.0`) to
+  match the `lints: ^6.1.0` dev-dependency, which requires SDK `>=3.8.0`.
+  The CI matrix now tests `3.8.0` and `stable`. The previous constraint was
+  internally inconsistent and left `dart pub get` unable to resolve on
+  3.4.x–3.7.x.
+- `calculateZones` now personalises the clinician-cap method with the
+  Karvonen/HRR formula when a `restingHr` is available (positive reserve
+  against the cap), so the lower zones sit above the resting heart rate
+  instead of a flat percentage that could fall below it. `method` remains
+  `ZoneMethod.clinicianCap` and reliability remains `high`.
+- **Breaking:** `calculateZones` now throws `ArgumentError` when `restingHr`
+  is at or above the resolved max HR (an inconsistent profile with no
+  heart-rate reserve). Previously it silently fell through to the percentage
+  methods and returned nonsensical zones at high/medium reliability.
+- `calculateBanisterTrimp` now resolves the maximum heart rate as
+  `clinicianMaxHr ?? measuredMaxHr ?? estimatedMaxHr`, so clinician-capped
+  profiles get a training-load score instead of `null`.
+- Override lists (`bands`/`labels`/`effortLabels`/`descriptiveLabels`/
+  `colors`) and `CustomZoneBoundary.labels` now throw `ArgumentError` when
+  their length is not exactly 5. The list-length checks were previously
+  `assert`s (stripped in release builds); custom labels had no check and
+  crashed with a bare `RangeError`.
 - `calculateZones` now throws `ArgumentError` when `CustomZoneBoundary`
   lower bounds are not strictly increasing, instead of silently building
   inverted zones that never match any reading.
@@ -24,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Corrected the `CalculatedZone.upperPercent` contract to note that the
+  `ZoneMethod.lthrFriel` top zone can exceed 1.0 (default Friel zone 5 runs
+  to 110 % of LTHR).
+- Corrected stale worked examples and expected outputs in the Antora docs
+  (Edwards TRIMP example, getting-started version pin and output, Åstrand /
+  Miller–Faulkner formula values, and method `reason` strings).
 - Documented `ZoneConfiguration.maxHr` semantics for custom zones
   (`zone5Lower`), the dual interpretation of the `bands` parameter
   (percent-of-max vs percent-of-LTHR), and the assumed-valid input contract

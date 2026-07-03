@@ -127,25 +127,38 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Karvonen requires restingHr < maxHr — otherwise skip to the next method
+  // Inconsistent data: restingHr >= resolved max throws rather than emitting
+  // nonsensical zones at high reliability.
   // -------------------------------------------------------------------------
-  group('Karvonen with non-positive heart rate reserve', () {
-    test('restingHr above maxHr skips Karvonen, uses percent of measured', () {
+  group('restingHr at or above the resolved maximum', () {
+    test('restingHr above measured max throws ArgumentError', () {
       const profile = HealthProfile(measuredMaxHr: 120, restingHr: 130);
-      final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.percentOfMeasuredMax);
-      // Zones must still be well-formed (lower < upper).
-      for (final z in config.zones) {
-        if (z.upperBound != null) {
-          expect(z.lowerBound, lessThan(z.upperBound!));
-        }
-      }
+      expect(() => calculateZones(profile), throwsArgumentError);
     });
 
-    test('restingHr equal to maxHr also skips Karvonen', () {
+    test('restingHr equal to measured max throws ArgumentError', () {
       const profile = HealthProfile(measuredMaxHr: 120, restingHr: 120);
-      final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.percentOfMeasuredMax);
+      expect(() => calculateZones(profile), throwsArgumentError);
+    });
+
+    test('restingHr above age-estimated max throws ArgumentError', () {
+      // Tanaka age 60 → 166; resting 170 leaves no reserve.
+      const profile = HealthProfile(age: 60, restingHr: 170);
+      expect(() => calculateZones(profile), throwsArgumentError);
+    });
+
+    test('error message identifies the inconsistency', () {
+      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 130);
+      expect(
+        () => calculateZones(profile),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('inconsistent'),
+          ),
+        ),
+      );
     });
   });
 
@@ -681,46 +694,48 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Assert enforcement — override lists must have exactly 5 entries
+  // Length enforcement — override lists must have exactly 5 entries. Enforced
+  // at runtime (ArgumentError) so the contract survives release builds where
+  // asserts are stripped.
   // -------------------------------------------------------------------------
-  group('override list length asserts', () {
+  group('override list length validation', () {
     const profile = HealthProfile(age: 30);
 
-    test('bands length != 5 throws AssertionError', () {
+    test('bands length != 5 throws ArgumentError', () {
       expect(
         () => calculateZones(
           profile,
           bands: const [(50.0, 60.0), (60.0, 70.0)],
         ),
-        throwsA(isA<AssertionError>()),
+        throwsArgumentError,
       );
     });
 
     test('labels length != 5 throws', () {
       expect(
         () => calculateZones(profile, labels: const ['a', 'b', 'c']),
-        throwsA(isA<AssertionError>()),
+        throwsArgumentError,
       );
     });
 
     test('effortLabels length != 5 throws', () {
       expect(
         () => calculateZones(profile, effortLabels: const ['a']),
-        throwsA(isA<AssertionError>()),
+        throwsArgumentError,
       );
     });
 
     test('descriptiveLabels length != 5 throws', () {
       expect(
         () => calculateZones(profile, descriptiveLabels: const ['a']),
-        throwsA(isA<AssertionError>()),
+        throwsArgumentError,
       );
     });
 
     test('colors length != 5 throws', () {
       expect(
         () => calculateZones(profile, colors: const [0xFF000000]),
-        throwsA(isA<AssertionError>()),
+        throwsArgumentError,
       );
     });
   });
@@ -897,6 +912,100 @@ void main() {
       expect(config.zones[1].lowerBound, boundary);
       final zone = currentZoneFromConfig(boundary, config);
       expect(zone?.zoneNumber, 2);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Clinician cap with a resting HR personalises via Karvonen (#9)
+  // -------------------------------------------------------------------------
+  group('Clinician cap with resting HR (Karvonen personalisation)', () {
+    test('lower zones are anchored above the resting HR', () {
+      // Clinician cap 150, resting 90 → HRR 60. Zone 1 lower = 90 + 50% × 60.
+      const profile = HealthProfile(clinicianMaxHr: 150, restingHr: 90);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.clinicianCap);
+      expect(config.reliability, ZoneReliability.high);
+      expect(config.maxHr, 150);
+      expect(config.zones[0].lowerBound, 120);
+      expect(config.zones[0].lowerBound, greaterThan(90));
+      expect(config.reason, contains('clinician'));
+      expect(config.reason, contains('Karvonen'));
+    });
+
+    test('beta-blocker + clinician cap + resting stays high reliability', () {
+      const profile = HealthProfile(
+        clinicianMaxHr: 150,
+        restingHr: 60,
+        betaBlocker: true,
+      );
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.clinicianCap);
+      expect(config.reliability, ZoneReliability.high);
+      // HRR 90 → zone 1 lower = 60 + 45 = 105 (above resting).
+      expect(config.zones[0].lowerBound, 105);
+    });
+
+    test('clinician cap without resting HR keeps flat percentage bands', () {
+      const profile = HealthProfile(clinicianMaxHr: 160);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.clinicianCap);
+      expect(config.zones[0].lowerBound, 80); // 50% of 160
+    });
+
+    test('resting HR at or above the clinician cap keeps flat bands', () {
+      // No positive reserve against the cap → fall back to percentage bands
+      // rather than inverted Karvonen zones.
+      const profile = HealthProfile(clinicianMaxHr: 120, restingHr: 130);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.clinicianCap);
+      expect(config.zones[0].lowerBound, 60); // 50% of 120
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // upperPercent may exceed 1.0 for LTHR / Friel zone 5 (#17)
+  // -------------------------------------------------------------------------
+  group('LTHR zone 5 upperPercent', () {
+    test('default Friel zone 5 upperPercent is 1.1', () {
+      const profile = HealthProfile(lactateThresholdHr: 160);
+      final config = calculateZones(profile)!;
+      expect(config.method, ZoneMethod.lthrFriel);
+      expect(config.zones[4].upperPercent, closeTo(1.1, 1e-9));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Custom zone labels must have exactly 5 entries (#15)
+  // -------------------------------------------------------------------------
+  group('custom zone label length validation', () {
+    test('fewer than 5 custom labels throws ArgumentError, not RangeError', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 100,
+          zone2Lower: 120,
+          zone3Lower: 140,
+          zone4Lower: 160,
+          zone5Lower: 180,
+          labels: ['Easy', 'Steady', 'Tempo', 'Hard'],
+        ),
+      );
+      expect(() => calculateZones(profile), throwsArgumentError);
+    });
+
+    test('exactly 5 custom labels is accepted', () {
+      const profile = HealthProfile(
+        customZones: CustomZoneBoundary(
+          zone1Lower: 100,
+          zone2Lower: 120,
+          zone3Lower: 140,
+          zone4Lower: 160,
+          zone5Lower: 180,
+          labels: ['Easy', 'Steady', 'Tempo', 'Hard', 'Max'],
+        ),
+      );
+      final config = calculateZones(profile)!;
+      expect(config.zones[0].effortLabel, 'Easy');
+      expect(config.zones[4].effortLabel, 'Max');
     });
   });
 }

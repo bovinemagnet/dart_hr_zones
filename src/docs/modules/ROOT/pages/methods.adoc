@@ -62,7 +62,7 @@ final config = calculateZones(HealthProfile(
 === Gotchas
 
 * `lowerPercent` and `upperPercent` on each `CalculatedZone` are both `0` — percentages are not meaningful when BPM bounds are explicitly provided.
-* Other `HealthProfile` fields are ignored by this method, but caution flags still populate in `ZoneConfiguration.reason` as informational context.
+* Other `HealthProfile` fields, including caution flags (`betaBlocker`, `heartCondition`), are ignored by this method. `ZoneConfiguration.reason` for custom zones is always the fixed string `"Using custom zone boundaries"`, regardless of any caution flags set on the profile.
 
 == Clinician cap
 

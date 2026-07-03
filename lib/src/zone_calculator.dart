@@ -81,9 +81,13 @@ class CalculatedZone {
   /// Zero for [ZoneMethod.custom] zones (percentages are not applicable).
   final double lowerPercent;
 
-  /// Upper bound as a fraction of the underlying max / reserve (0.0 – 1.0).
+  /// Upper bound as a fraction of the underlying max / reserve.
   ///
-  /// Zero for [ZoneMethod.custom] zones (percentages are not applicable).
+  /// Normally within 0.0 – 1.0. Zero for [ZoneMethod.custom] zones
+  /// (percentages are not applicable). For [ZoneMethod.lthrFriel] the top
+  /// zone can exceed 1.0 (the default Friel zone 5 runs to 110 % of LTHR, so
+  /// `upperPercent` is 1.1) — a UI must not assume this value is capped at
+  /// 1.0.
   final double upperPercent;
 
   /// Creates a [CalculatedZone].
@@ -289,17 +293,13 @@ ZoneConfiguration? calculateZones(
   final effectiveDescs = descriptiveLabels ?? _defaultDescriptiveLabels;
   final effectiveColors = colors ?? _defaultColors;
 
-  assert(effectiveBands.length == 5, 'bands must have exactly 5 entries');
-  assert(effectiveLabels.length == 5, 'labels must have exactly 5 entries');
-  assert(
-    effectiveEfforts.length == 5,
-    'effortLabels must have exactly 5 entries',
-  );
-  assert(
-    effectiveDescs.length == 5,
-    'descriptiveLabels must have exactly 5 entries',
-  );
-  assert(effectiveColors.length == 5, 'colors must have exactly 5 entries');
+  // Enforced at runtime (not via `assert`) so the contract still holds in
+  // release builds, where asserts are stripped.
+  _require5(effectiveBands.length, 'bands');
+  _require5(effectiveLabels.length, 'labels');
+  _require5(effectiveEfforts.length, 'effortLabels');
+  _require5(effectiveDescs.length, 'descriptiveLabels');
+  _require5(effectiveColors.length, 'colors');
 
   // 1. Custom zones
   final custom = profile.customZones;
@@ -313,9 +313,29 @@ ZoneConfiguration? calculateZones(
   }
 
   // 2. Clinician cap — authoritative. Overrides caution mode; reliability is
-  // high because the clinician specifically prescribed this cap.
+  // high because the clinician specifically prescribed this cap. When a
+  // resting HR is also available (with a positive reserve against the cap),
+  // the zones are personalised with the Karvonen/HRR formula anchored on the
+  // clinician cap, so the lower zones sit above the resting heart rate rather
+  // than a flat percentage that can fall below it.
   final clinicianMax = profile.clinicianMaxHr;
   if (clinicianMax != null) {
+    final clinicianResting = profile.restingHr;
+    if (clinicianResting != null && clinicianResting < clinicianMax) {
+      return _hrrZones(
+        maxHr: clinicianMax,
+        restingHr: clinicianResting,
+        method: ZoneMethod.clinicianCap,
+        reliability: ZoneReliability.high,
+        reason: 'Using clinician-provided maximum heart rate with heart rate '
+            'reserve (Karvonen) personalisation',
+        bands: effectiveBands,
+        labels: effectiveLabels,
+        efforts: effectiveEfforts,
+        descs: effectiveDescs,
+        colors: effectiveColors,
+      );
+    }
     return _percentOfMaxZones(
       maxHr: clinicianMax,
       method: ZoneMethod.clinicianCap,
@@ -351,11 +371,24 @@ ZoneConfiguration? calculateZones(
 
   // Resolve best available max HR for Karvonen and percentage methods.
   final resolvedMax = _resolveMaxHr(profile);
-
-  // 4. HRR / Karvonen — needs a positive heart-rate reserve; otherwise the
-  // zones would come out inverted, so fall through to the percentage methods.
   final restingHr = profile.restingHr;
-  if (resolvedMax != null && restingHr != null && restingHr < resolvedMax) {
+
+  // Inconsistent data: a resting HR at or above the resolved maximum leaves
+  // no heart-rate reserve and cannot yield meaningful zones. Fail loudly
+  // rather than emit nonsensical bounds (at or below resting HR) with a
+  // misleading high/medium reliability.
+  if (resolvedMax != null && restingHr != null && restingHr >= resolvedMax) {
+    throw ArgumentError.value(
+      restingHr,
+      'restingHr',
+      'resting heart rate ($restingHr bpm) must be below the resolved maximum '
+          'heart rate ($resolvedMax bpm); the profile data is inconsistent',
+    );
+  }
+
+  // 4. HRR / Karvonen — a positive heart-rate reserve is guaranteed here
+  // (the inconsistent case above has already thrown).
+  if (resolvedMax != null && restingHr != null) {
     final reliability = profile.isCautionMode
         ? ZoneReliability.low
         : _maxHrReliability(profile, resolvedMax);
@@ -425,6 +458,14 @@ CalculatedZone? currentZoneFromConfig(int bpm, ZoneConfiguration config) {
 // Private helpers
 // ---------------------------------------------------------------------------
 
+/// Throws [ArgumentError] when a zone-configuration list is not exactly five
+/// entries long. Used to enforce the five-zone contract at runtime.
+void _require5(int length, String name) {
+  if (length != 5) {
+    throw ArgumentError.value(length, name, '$name must have exactly 5 entries');
+  }
+}
+
 /// Resolves the best max HR available for Karvonen / percentage methods.
 /// Measured max takes priority; otherwise falls back to the configured
 /// age-based formula. Returns `null` when neither is available.
@@ -493,6 +534,14 @@ ZoneConfiguration _customZones(
     }
   }
   final customLabels = custom.labels;
+  if (customLabels != null && customLabels.length != 5) {
+    throw ArgumentError.value(
+      customLabels,
+      'customZones.labels',
+      'custom zone labels must have exactly 5 entries when provided, '
+          'but got ${customLabels.length}',
+    );
+  }
 
   final zones = <CalculatedZone>[];
   for (var i = 0; i < 5; i++) {
@@ -577,6 +626,7 @@ ZoneConfiguration _hrrZones({
   required List<String> efforts,
   required List<String> descs,
   required List<int> colors,
+  ZoneMethod method = ZoneMethod.hrrKarvonen,
 }) {
   final hrr = maxHr - restingHr;
   final zones = <CalculatedZone>[];
@@ -600,7 +650,7 @@ ZoneConfiguration _hrrZones({
   }
   return ZoneConfiguration(
     zones: List.unmodifiable(zones),
-    method: ZoneMethod.hrrKarvonen,
+    method: method,
     reliability: reliability,
     maxHr: maxHr,
     reason: reason,

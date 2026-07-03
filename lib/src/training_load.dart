@@ -66,9 +66,11 @@ double calculateEdwardsTrimp(TimeInZoneSummary summary) {
 /// [calculateTimeInZones]). Intervals with non-positive duration are ignored.
 ///
 /// Returns `null` when the [profile] lacks either [HealthProfile.restingHr]
-/// or a resolvable maximum heart rate (measured or age-estimated via
-/// [HealthProfile.maxHrFormula]). Returns `0` when [readings] has fewer than
-/// two samples.
+/// or a resolvable maximum heart rate. The maximum is resolved in the same
+/// priority order `calculateZones` uses for its anchor:
+/// [HealthProfile.clinicianMaxHr], then [HealthProfile.measuredMaxHr], then
+/// the age-estimate via [HealthProfile.maxHrFormula]. Returns `0` when
+/// [readings] has fewer than two samples.
 ///
 /// The [coefficients] parameter defaults to
 /// [BanisterCoefficients.male]; pass [BanisterCoefficients.female] or a
@@ -80,7 +82,8 @@ double? calculateBanisterTrimp(
 }) {
   final restingHr = profile.restingHr;
   if (restingHr == null) return null;
-  final maxHr = profile.measuredMaxHr ?? profile.estimatedMaxHr;
+  final maxHr =
+      profile.clinicianMaxHr ?? profile.measuredMaxHr ?? profile.estimatedMaxHr;
   if (maxHr == null) return null;
   final range = maxHr - restingHr;
   if (range <= 0) return null;

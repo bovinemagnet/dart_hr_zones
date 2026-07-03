@@ -39,17 +39,20 @@ It works with any zone configuration — max-HR-based, LTHR-anchored, or custom.
 [source,dart]
 ----
 final readings = [
-  HrReading(bpm: 120, elapsed: Duration.zero),
-  HrReading(bpm: 140, elapsed: Duration(minutes: 20)),  // 20 min in zone 2
-  HrReading(bpm: 158, elapsed: Duration(minutes: 40)),  // 20 min in zone 3
+  HrReading(bpm: 120, elapsed: Duration.zero),          // interval 1 start: 120 bpm — below zone 1's 122 bpm lower bound, no zone
+  HrReading(bpm: 140, elapsed: Duration(minutes: 20)),  // interval 2 start: 140 bpm → zone 2 (134–147 bpm), 20 min
+  HrReading(bpm: 158, elapsed: Duration(minutes: 40)),  // final reading (not an interval start)
 ];
 
 final config = calculateZones(HealthProfile(age: 35, restingHr: 60))!;
+// HRR/Karvonen zones (max HR 184 bpm, resting HR 60 bpm): zone 1 = 122–134 bpm, zone 2 = 134–147 bpm.
 final summary = calculateTimeInZones(readings, config);
 final edwards = calculateEdwardsTrimp(summary);
 
 print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
-// 20 min × 2 (zone 2) + 20 min × 3 (zone 3) = 40 + 60 = 100
+// Interval 1 (earlier reading 120 bpm, 20 min): below zone 1 — contributes nothing.
+// Interval 2 (earlier reading 140 bpm, 20 min): zone 2 → 2 × 20 = 40.
+// Edwards TRIMP = 40.0
 ----
 
 === When it returns zero
