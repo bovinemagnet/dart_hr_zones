@@ -317,6 +317,36 @@ final banister = calculateBanisterTrimp(
 
 ---
 
+## JSON serialisation
+
+Every public value type provides `toJson()` and a `fromJson` factory, so the
+library drops into REST APIs, offline storage and caches without glue code.
+Serialisation uses `dart:convert` only — no code generation, no build step,
+and no extra runtime dependencies.
+
+```dart
+import 'dart:convert';
+
+final profile = HealthProfile(age: 40, restingHr: 55);
+final config = calculateZones(profile)!;
+
+// Encode to a JSON string…
+final text = jsonEncode(config.toJson());
+
+// …and decode it back to an identical value.
+final restored = ZoneConfiguration.fromJson(jsonDecode(text));
+assert(restored == config);
+```
+
+`toJson`/`fromJson` are available on `HealthProfile`, `CustomZoneBoundary`,
+`ZoneConfiguration`, `CalculatedZone`, `HrReading`, `TimeInZoneSummary`,
+`ZoneDuration`, and `BanisterCoefficients`. Enums are serialised by `name`
+(not ordinal) for forward compatibility, `Duration`s as integer microseconds,
+and null optional fields are omitted. Every type round-trips:
+`fromJson(x.toJson()) == x`.
+
+---
+
 ## Public API
 
 ### Functions

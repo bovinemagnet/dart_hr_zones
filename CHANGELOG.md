@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JSON serialisation across every public value type. `toJson()` and a
+  `fromJson` factory are now available on `HealthProfile`,
+  `CustomZoneBoundary`, `ZoneConfiguration`, `CalculatedZone`, `HrReading`,
+  `TimeInZoneSummary`, `ZoneDuration`, and `BanisterCoefficients`. Uses only
+  `dart:convert` (no code generation, zero runtime dependencies); enums are
+  serialised by `name`, `Duration`s as integer microseconds, and every type
+  round-trips (`fromJson(x.toJson()) == x`).
+- Value `==`/`hashCode` on `HealthProfile`, `ZoneConfiguration`,
+  `TimeInZoneSummary`, `ZoneDuration`, and `BanisterCoefficients` (previously
+  identity-only), underpinning the serialisation round-trip contract.
 - `HrReading.isRecoverySample` flag. When set on the final reading,
   `calculateTimeInZones` excludes the preceding cooldown interval from the
   per-zone totals and populates `recoveryHrDrop` deterministically, avoiding
