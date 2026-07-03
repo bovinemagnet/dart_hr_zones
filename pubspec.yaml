@@ -6,7 +6,7 @@ version: 0.0.3
 homepage: https://github.com/bovinemagnet/dart_hr_zones
 
 environment:
-  sdk: ^3.4.0
+  sdk: ^3.8.0
 
 dev_dependencies:
   lints: ^6.1.0

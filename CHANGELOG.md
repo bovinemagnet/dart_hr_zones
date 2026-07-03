@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** raised the minimum Dart SDK to `^3.8.0` (was `^3.4.0`) to
+  match the `lints: ^6.1.0` dev-dependency, which requires SDK `>=3.8.0`.
+  The CI matrix now tests `3.8.0` and `stable`. The previous constraint was
+  internally inconsistent and left `dart pub get` unable to resolve on
+  3.4.x–3.7.x.
 - `calculateZones` now personalises the clinician-cap method with the
   Karvonen/HRR formula when a `restingHr` is available (positive reserve
   against the cap), so the lower zones sit above the resting heart rate
