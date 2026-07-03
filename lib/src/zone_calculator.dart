@@ -114,6 +114,34 @@ class CalculatedZone {
     return true;
   }
 
+  /// Serialises this zone to a JSON-compatible map.
+  ///
+  /// `upperBound` is omitted for the open-ended top zone.
+  Map<String, dynamic> toJson() => {
+        'zoneNumber': zoneNumber,
+        'label': label,
+        'effortLabel': effortLabel,
+        'descriptiveLabel': descriptiveLabel,
+        'lowerBound': lowerBound,
+        if (upperBound != null) 'upperBound': upperBound,
+        'color': color,
+        'lowerPercent': lowerPercent,
+        'upperPercent': upperPercent,
+      };
+
+  /// Reconstructs a [CalculatedZone] from a [toJson] map.
+  factory CalculatedZone.fromJson(Map<String, dynamic> json) => CalculatedZone(
+        zoneNumber: json['zoneNumber'] as int,
+        label: json['label'] as String,
+        effortLabel: json['effortLabel'] as String,
+        descriptiveLabel: json['descriptiveLabel'] as String,
+        lowerBound: json['lowerBound'] as int,
+        upperBound: json['upperBound'] as int?,
+        color: json['color'] as int,
+        lowerPercent: (json['lowerPercent'] as num).toDouble(),
+        upperPercent: (json['upperPercent'] as num).toDouble(),
+      );
+
   @override
   String toString() => 'CalculatedZone($zoneNumber: $lowerBound'
       '${upperBound != null ? ' – ${upperBound! - 1}' : '+'} bpm)';
@@ -171,10 +199,63 @@ class ZoneConfiguration {
     required this.reason,
   });
 
+  /// Serialises this configuration to a JSON-compatible map.
+  ///
+  /// [method] and [reliability] are stored by their enum `name`.
+  Map<String, dynamic> toJson() => {
+        'zones': zones.map((z) => z.toJson()).toList(),
+        'method': method.name,
+        'reliability': reliability.name,
+        'maxHr': maxHr,
+        'reason': reason,
+      };
+
+  /// Reconstructs a [ZoneConfiguration] from a [toJson] map.
+  factory ZoneConfiguration.fromJson(Map<String, dynamic> json) =>
+      ZoneConfiguration(
+        zones: (json['zones'] as List<dynamic>)
+            .map((z) =>
+                CalculatedZone.fromJson((z as Map).cast<String, dynamic>()))
+            .toList(),
+        method: ZoneMethod.values.byName(json['method'] as String),
+        reliability:
+            ZoneReliability.values.byName(json['reliability'] as String),
+        maxHr: json['maxHr'] as int,
+        reason: json['reason'] as String,
+      );
+
   @override
   String toString() =>
       'ZoneConfiguration(method: $method, reliability: $reliability, '
       'maxHr: $maxHr, zones: $zones)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ZoneConfiguration || runtimeType != other.runtimeType) {
+      return false;
+    }
+    if (method != other.method ||
+        reliability != other.reliability ||
+        maxHr != other.maxHr ||
+        reason != other.reason ||
+        zones.length != other.zones.length) {
+      return false;
+    }
+    for (var i = 0; i < zones.length; i++) {
+      if (zones[i] != other.zones[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        Object.hashAll(zones),
+        method,
+        reliability,
+        maxHr,
+        reason,
+      );
 }
 
 // ---------------------------------------------------------------------------

@@ -14,5 +14,6 @@
 
 .Reference
 * xref:api-reference.adoc[API Reference]
+* xref:serialisation.adoc[JSON Serialisation]
 * xref:examples.adoc[Examples]
 * xref:changelog.adoc[Changelog]

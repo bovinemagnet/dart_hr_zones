@@ -31,8 +31,29 @@ class BanisterCoefficients {
       : a = 0.86,
         b = 1.67;
 
+  /// Serialises these coefficients to a JSON-compatible map.
+  Map<String, dynamic> toJson() => {'a': a, 'b': b};
+
+  /// Reconstructs a [BanisterCoefficients] from a [toJson] map.
+  factory BanisterCoefficients.fromJson(Map<String, dynamic> json) =>
+      BanisterCoefficients(
+        a: (json['a'] as num).toDouble(),
+        b: (json['b'] as num).toDouble(),
+      );
+
   @override
   String toString() => 'BanisterCoefficients(a: $a, b: $b)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BanisterCoefficients &&
+          runtimeType == other.runtimeType &&
+          a == other.a &&
+          b == other.b;
+
+  @override
+  int get hashCode => Object.hash(a, b);
 }
 
 /// Edwards (1993) TRIMP: zone-weighted training load.

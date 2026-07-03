@@ -16,9 +16,35 @@ class ZoneDuration {
   /// Creates a [ZoneDuration].
   const ZoneDuration({required this.zone, required this.duration});
 
+  /// Serialises this entry to a JSON-compatible map.
+  ///
+  /// [duration] is stored as integer microseconds.
+  Map<String, dynamic> toJson() => {
+        'zone': zone.toJson(),
+        'durationMicroseconds': duration.inMicroseconds,
+      };
+
+  /// Reconstructs a [ZoneDuration] from a [toJson] map.
+  factory ZoneDuration.fromJson(Map<String, dynamic> json) => ZoneDuration(
+        zone: CalculatedZone.fromJson((json['zone'] as Map).cast<String, dynamic>()),
+        duration:
+            Duration(microseconds: json['durationMicroseconds'] as int),
+      );
+
   @override
   String toString() =>
       'ZoneDuration(zone: ${zone.zoneNumber}, duration: $duration)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ZoneDuration &&
+          runtimeType == other.runtimeType &&
+          zone == other.zone &&
+          duration == other.duration;
+
+  @override
+  int get hashCode => Object.hash(zone, duration);
 }
 
 /// Constants used to classify reading cadence for recovery detection.
@@ -83,12 +109,64 @@ class TimeInZoneSummary {
     return Duration.zero;
   }
 
+  /// Serialises this summary to a JSON-compatible map.
+  ///
+  /// Durations are stored as integer microseconds; `recoveryHrDrop` is
+  /// omitted when `null`.
+  Map<String, dynamic> toJson() => {
+        'zoneDurations': zoneDurations.map((zd) => zd.toJson()).toList(),
+        'moderateOrHigherDurationMicroseconds':
+            moderateOrHigherDuration.inMicroseconds,
+        'belowZone1DurationMicroseconds': belowZone1Duration.inMicroseconds,
+        if (recoveryHrDrop != null) 'recoveryHrDrop': recoveryHrDrop,
+      };
+
+  /// Reconstructs a [TimeInZoneSummary] from a [toJson] map.
+  factory TimeInZoneSummary.fromJson(Map<String, dynamic> json) =>
+      TimeInZoneSummary(
+        zoneDurations: (json['zoneDurations'] as List<dynamic>)
+            .map((zd) =>
+                ZoneDuration.fromJson((zd as Map).cast<String, dynamic>()))
+            .toList(),
+        moderateOrHigherDuration: Duration(
+            microseconds: json['moderateOrHigherDurationMicroseconds'] as int),
+        belowZone1Duration: Duration(
+            microseconds: json['belowZone1DurationMicroseconds'] as int),
+        recoveryHrDrop: json['recoveryHrDrop'] as int?,
+      );
+
   @override
   String toString() => 'TimeInZoneSummary('
       'moderateOrHigher: $moderateOrHigherDuration, '
       'belowZone1: $belowZone1Duration, '
       'recoveryHrDrop: $recoveryHrDrop, '
       'zones: $zoneDurations)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TimeInZoneSummary || runtimeType != other.runtimeType) {
+      return false;
+    }
+    if (moderateOrHigherDuration != other.moderateOrHigherDuration ||
+        belowZone1Duration != other.belowZone1Duration ||
+        recoveryHrDrop != other.recoveryHrDrop ||
+        zoneDurations.length != other.zoneDurations.length) {
+      return false;
+    }
+    for (var i = 0; i < zoneDurations.length; i++) {
+      if (zoneDurations[i] != other.zoneDurations[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        Object.hashAll(zoneDurations),
+        moderateOrHigherDuration,
+        belowZone1Duration,
+        recoveryHrDrop,
+      );
 }
 
 // ---------------------------------------------------------------------------

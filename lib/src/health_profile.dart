@@ -125,6 +125,29 @@ class CustomZoneBoundary {
     this.labels,
   });
 
+  /// Serialises these boundaries to a JSON-compatible map.
+  ///
+  /// `labels` is omitted when `null`.
+  Map<String, dynamic> toJson() => {
+        'zone1Lower': zone1Lower,
+        'zone2Lower': zone2Lower,
+        'zone3Lower': zone3Lower,
+        'zone4Lower': zone4Lower,
+        'zone5Lower': zone5Lower,
+        if (labels != null) 'labels': labels,
+      };
+
+  /// Reconstructs a [CustomZoneBoundary] from a [toJson] map.
+  factory CustomZoneBoundary.fromJson(Map<String, dynamic> json) =>
+      CustomZoneBoundary(
+        zone1Lower: json['zone1Lower'] as int,
+        zone2Lower: json['zone2Lower'] as int,
+        zone3Lower: json['zone3Lower'] as int,
+        zone4Lower: json['zone4Lower'] as int,
+        zone5Lower: json['zone5Lower'] as int,
+        labels: (json['labels'] as List<dynamic>?)?.cast<String>(),
+      );
+
   @override
   String toString() => 'CustomZoneBoundary('
       'z1: $zone1Lower, z2: $zone2Lower, z3: $zone3Lower, '
@@ -284,6 +307,40 @@ class HealthProfile {
     );
   }
 
+  /// Serialises this profile to a JSON-compatible map.
+  ///
+  /// Null optional fields are omitted; [maxHrFormula] is stored by its enum
+  /// `name` for forward compatibility.
+  Map<String, dynamic> toJson() => {
+        if (age != null) 'age': age,
+        if (restingHr != null) 'restingHr': restingHr,
+        if (clinicianMaxHr != null) 'clinicianMaxHr': clinicianMaxHr,
+        if (measuredMaxHr != null) 'measuredMaxHr': measuredMaxHr,
+        if (lactateThresholdHr != null) 'lactateThresholdHr': lactateThresholdHr,
+        'betaBlocker': betaBlocker,
+        'heartCondition': heartCondition,
+        if (customZones != null) 'customZones': customZones!.toJson(),
+        'maxHrFormula': maxHrFormula.name,
+      };
+
+  /// Reconstructs a [HealthProfile] from a [toJson] map.
+  factory HealthProfile.fromJson(Map<String, dynamic> json) => HealthProfile(
+        age: json['age'] as int?,
+        restingHr: json['restingHr'] as int?,
+        clinicianMaxHr: json['clinicianMaxHr'] as int?,
+        measuredMaxHr: json['measuredMaxHr'] as int?,
+        lactateThresholdHr: json['lactateThresholdHr'] as int?,
+        betaBlocker: json['betaBlocker'] as bool? ?? false,
+        heartCondition: json['heartCondition'] as bool? ?? false,
+        customZones: json['customZones'] == null
+            ? null
+            : CustomZoneBoundary.fromJson(
+                (json['customZones'] as Map).cast<String, dynamic>()),
+        maxHrFormula: json['maxHrFormula'] == null
+            ? MaxHrFormula.tanaka
+            : MaxHrFormula.values.byName(json['maxHrFormula'] as String),
+      );
+
   @override
   String toString() => 'HealthProfile('
       'age: $age, restingHr: $restingHr, measuredMaxHr: $measuredMaxHr, '
@@ -292,4 +349,32 @@ class HealthProfile {
       'betaBlocker: $betaBlocker, '
       'heartCondition: $heartCondition, customZones: $customZones, '
       'maxHrFormula: $maxHrFormula)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HealthProfile &&
+          runtimeType == other.runtimeType &&
+          age == other.age &&
+          restingHr == other.restingHr &&
+          clinicianMaxHr == other.clinicianMaxHr &&
+          measuredMaxHr == other.measuredMaxHr &&
+          lactateThresholdHr == other.lactateThresholdHr &&
+          betaBlocker == other.betaBlocker &&
+          heartCondition == other.heartCondition &&
+          customZones == other.customZones &&
+          maxHrFormula == other.maxHrFormula;
+
+  @override
+  int get hashCode => Object.hash(
+        age,
+        restingHr,
+        clinicianMaxHr,
+        measuredMaxHr,
+        lactateThresholdHr,
+        betaBlocker,
+        heartCondition,
+        customZones,
+        maxHrFormula,
+      );
 }
