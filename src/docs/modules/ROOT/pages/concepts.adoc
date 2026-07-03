@@ -93,13 +93,13 @@ Example reason strings:
 
 [source,text]
 ----
-"Using heart rate reserve (Karvonen) method with measured maximum heart rate."
+"Using heart rate reserve (Karvonen) method"
 
-"Caution mode (beta blocker medication reported). Using percentage of estimated
-maximum heart rate (Tanaka). Consider setting a clinician-provided maximum
-heart rate."
+"Caution mode (beta blocker medication reported). Using age-estimated
+maximum heart rate (Tanaka (208 − 0.7 × age)). Consider setting a
+clinician-provided maximum heart rate."
 
-"Using clinician-prescribed maximum heart rate."
+"Using clinician-provided maximum heart rate"
 ----
 
 == CalculatedZone fields

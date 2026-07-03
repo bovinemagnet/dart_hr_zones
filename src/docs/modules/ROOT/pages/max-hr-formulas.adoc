@@ -56,8 +56,8 @@ Values are rounded to the nearest whole number as `MaxHrFormula.apply(age)` retu
 |`fox220`  |190 |180 |171
 |`nes`     |192 |185 |180
 |`gellish2007` |186 |179 |173
-|`astrand` |192 |183 |176
-|`millerFaulkner` |191 |183 |175
+|`astrand` |191 |183 |175
+|`millerFaulkner` |192 |183 |175
 |===
 
 NOTE: At age 40, `tanaka` and `fox220` give the same result (180 bpm) because their lines cross near that age.
@@ -98,8 +98,8 @@ MaxHrFormula.tanaka.apply(30);         // 187
 MaxHrFormula.fox220.apply(30);         // 190
 MaxHrFormula.nes.apply(30);            // 192
 MaxHrFormula.gellish2007.apply(30);    // 186
-MaxHrFormula.astrand.apply(30);        // 192
-MaxHrFormula.millerFaulkner.apply(30); // 191
+MaxHrFormula.astrand.apply(30);        // 191
+MaxHrFormula.millerFaulkner.apply(30); // 192
 ----
 
 The `displayName` getter returns a human-readable string suitable for UI labels:

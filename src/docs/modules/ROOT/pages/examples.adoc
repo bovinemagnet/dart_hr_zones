@@ -48,7 +48,7 @@ void main() {
 Method:      percentOfEstimatedMax
 Reliability: medium
 Max HR:      184 bpm
-Reason:      Using percentage of estimated maximum heart rate (Tanaka).
+Reason:      Using age-estimated maximum heart rate (Tanaka (208 − 0.7 × age))
 
 Zone 1 – Recovery: 92–110 bpm  [Easy]
 Zone 2 – Base Fitness: 110–129 bpm  [Light]

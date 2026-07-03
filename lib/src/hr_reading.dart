@@ -11,11 +11,26 @@ class HrReading {
   /// taken.
   final Duration elapsed;
 
+  /// Whether this sample is a deliberate post-exercise recovery measurement
+  /// (as opposed to part of the active session).
+  ///
+  /// Set this on a reading appended after exercise has stopped so
+  /// `calculateTimeInZones` can (a) compute the recovery heart-rate drop
+  /// deterministically and (b) exclude the cooldown gap that precedes it from
+  /// the per-zone totals. Marking the sample explicitly avoids
+  /// misclassifying a mid-session sensor dropout as a recovery measurement.
+  final bool isRecoverySample;
+
   /// Creates an [HrReading].
-  const HrReading({required this.bpm, required this.elapsed});
+  const HrReading({
+    required this.bpm,
+    required this.elapsed,
+    this.isRecoverySample = false,
+  });
 
   @override
-  String toString() => 'HrReading(bpm: $bpm, elapsed: $elapsed)';
+  String toString() => 'HrReading(bpm: $bpm, elapsed: $elapsed'
+      '${isRecoverySample ? ', recovery' : ''})';
 
   @override
   bool operator ==(Object other) =>
@@ -23,8 +38,9 @@ class HrReading {
       other is HrReading &&
           runtimeType == other.runtimeType &&
           bpm == other.bpm &&
-          elapsed == other.elapsed;
+          elapsed == other.elapsed &&
+          isRecoverySample == other.isRecoverySample;
 
   @override
-  int get hashCode => Object.hash(bpm, elapsed);
+  int get hashCode => Object.hash(bpm, elapsed, isRecoverySample);
 }

@@ -282,4 +282,88 @@ void main() {
       expect(() => summary.zoneDurations.clear(), throwsUnsupportedError);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Explicit recovery sample excludes the cooldown interval (#12)
+  // -------------------------------------------------------------------------
+  group('recovery sample cooldown exclusion', () {
+    test('cooldown gap before a flagged recovery sample is not counted', () {
+      // Age 40 → max 180. 150 bpm is zone 4 (144–162).
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 150, elapsed: Duration.zero),
+        const HrReading(bpm: 150, elapsed: Duration(minutes: 5)),
+        const HrReading(
+          bpm: 100,
+          elapsed: Duration(minutes: 6),
+          isRecoverySample: true,
+        ),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      // Only the first 5-minute interval counts; the 1-minute cooldown gap
+      // before the recovery sample is excluded.
+      expect(summary.durationInZone(4), const Duration(minutes: 5));
+      expect(summary.recoveryHrDrop, 50); // peak 150 − recovery 100
+    });
+
+    test('unflagged trailing reading still counts its interval (legacy)', () {
+      // Without the flag the last interval is accumulated as before, even when
+      // the gap is long enough for the legacy recovery heuristic.
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 150, elapsed: Duration.zero),
+        const HrReading(bpm: 150, elapsed: Duration(minutes: 5)),
+        const HrReading(bpm: 150, elapsed: Duration(minutes: 6)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      expect(summary.durationInZone(4), const Duration(minutes: 6));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Recovery marker is deterministic regardless of the gap (#14)
+  // -------------------------------------------------------------------------
+  group('recoveryHrDrop from explicit marker', () {
+    test('flagged recovery sample populates drop even with a short gap', () {
+      final readings = [
+        const HrReading(bpm: 170, elapsed: Duration.zero),
+        const HrReading(bpm: 160, elapsed: Duration(seconds: 10)),
+        const HrReading(
+          bpm: 120,
+          elapsed: Duration(seconds: 20), // gap 10s < 55s cooldownGap
+          isRecoverySample: true,
+        ),
+      ];
+      final summary = calculateTimeInZones(readings, _config());
+      expect(summary.recoveryHrDrop, 50); // peak 170 − recovery 120
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Time below zone 1 is surfaced, not silently dropped (#13)
+  // -------------------------------------------------------------------------
+  group('belowZone1Duration', () {
+    test('intervals starting below zone 1 accumulate into belowZone1', () {
+      // Age 40 → max 180, zone 1 lower = 90.
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 70, elapsed: Duration.zero),
+        const HrReading(bpm: 95, elapsed: Duration(minutes: 2)),
+        const HrReading(bpm: 100, elapsed: Duration(minutes: 2, seconds: 30)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      expect(summary.belowZone1Duration, const Duration(minutes: 2));
+      expect(summary.durationInZone(1), const Duration(seconds: 30));
+    });
+
+    test('defaults to zero when all readings are in a zone', () {
+      final config = _config();
+      final readings = [
+        const HrReading(bpm: 95, elapsed: Duration.zero),
+        const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+      ];
+      final summary = calculateTimeInZones(readings, config);
+      expect(summary.belowZone1Duration, Duration.zero);
+    });
+  });
 }

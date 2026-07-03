@@ -137,6 +137,36 @@ void main() {
       final trimp = calculateBanisterTrimp(readings, profile)!;
       expect(trimp, closeTo(8.357, 0.01));
     });
+
+    test('uses clinicianMaxHr when no measured/estimated max (#11)', () {
+      // Clinician-capped profile with no age or measured max: calculateZones
+      // succeeds for this profile, so TRIMP must not silently return null.
+      const profile = HealthProfile(clinicianMaxHr: 180, restingHr: 60);
+      final readings = [
+        const HrReading(bpm: 120, elapsed: Duration.zero),
+        const HrReading(bpm: 120, elapsed: Duration(minutes: 10)),
+      ];
+      // HRR range = 180 − 60 = 120, fraction (120−60)/120 = 0.5 → 8.357.
+      final trimp = calculateBanisterTrimp(readings, profile);
+      expect(trimp, isNotNull);
+      expect(trimp, closeTo(8.357, 0.01));
+    });
+
+    test('clinicianMaxHr takes priority over measured and estimated max', () {
+      const profile = HealthProfile(
+        age: 40,
+        restingHr: 60,
+        measuredMaxHr: 200,
+        clinicianMaxHr: 180,
+      );
+      final readings = [
+        const HrReading(bpm: 120, elapsed: Duration.zero),
+        const HrReading(bpm: 120, elapsed: Duration(minutes: 10)),
+      ];
+      // Uses clinician max 180 → HRR fraction 0.5 → 8.357 (not the 200 max).
+      final trimp = calculateBanisterTrimp(readings, profile)!;
+      expect(trimp, closeTo(8.357, 0.01));
+    });
   });
 
   // -------------------------------------------------------------------------
