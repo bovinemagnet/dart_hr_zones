@@ -1,8 +1,8 @@
 name: hr_zones
 description: >-
-  A pure-Dart heart rate zone calculator with five calculation methods,
+  A pure-Dart heart rate zone calculator with six calculation methods,
   automatic priority selection, reliability grading, and time-in-zone analysis.
-version: 0.0.3
+version: 0.1.0
 homepage: https://github.com/bovinemagnet/dart_hr_zones
 
 environment:

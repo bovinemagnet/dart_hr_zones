@@ -327,9 +327,8 @@ const List<int> _defaultColors = [
 ///
 /// Attempts each method in priority order and returns the first that succeeds:
 ///
-/// 1. [ZoneMethod.custom] — if [HealthProfile.customZones] is set. Throws
-///    [ArgumentError] when the custom lower bounds are not strictly
-///    increasing.
+/// 1. [ZoneMethod.custom] — if [HealthProfile.customZones] is set. The bounds
+///    are already validated by [CustomZoneBoundary]'s constructor.
 /// 2. [ZoneMethod.clinicianCap] — if [HealthProfile.clinicianMaxHr] is set.
 ///    Always wins over the fallback chain; reliability is `high` even in
 ///    caution mode because the clinician's guidance is authoritative.
@@ -596,6 +595,8 @@ ZoneConfiguration _customZones(
   List<String> efforts,
   List<int> colors,
 ) {
+  // The bounds are positive and strictly increasing, and any labels have
+  // exactly five entries — CustomZoneBoundary enforces both at construction.
   final lowers = [
     custom.zone1Lower,
     custom.zone2Lower,
@@ -603,26 +604,7 @@ ZoneConfiguration _customZones(
     custom.zone4Lower,
     custom.zone5Lower,
   ];
-  for (var i = 0; i < 4; i++) {
-    if (lowers[i] >= lowers[i + 1]) {
-      throw ArgumentError.value(
-        custom,
-        'customZones',
-        'zone lower bounds must be strictly increasing, but '
-            'zone ${i + 1} (${lowers[i]} bpm) >= '
-            'zone ${i + 2} (${lowers[i + 1]} bpm)',
-      );
-    }
-  }
   final customLabels = custom.labels;
-  if (customLabels != null && customLabels.length != 5) {
-    throw ArgumentError.value(
-      customLabels,
-      'customZones.labels',
-      'custom zone labels must have exactly 5 entries when provided, '
-          'but got ${customLabels.length}',
-    );
-  }
 
   final zones = <CalculatedZone>[];
   for (var i = 0; i < 5; i++) {

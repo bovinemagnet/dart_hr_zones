@@ -59,6 +59,8 @@ Getters: `isCautionMode`, `estimatedMaxHr`.
 
 Method: `copyWith({...clear... flags})` — pass `clear*: true` to reset a field to `null`.
 
+NOTE: The constructor validates its inputs and throws `ArgumentError` — it is not `const`. Any supplied `age`, `restingHr`, `measuredMaxHr`, `clinicianMaxHr`, or `lactateThresholdHr` must be positive, and `restingHr` must be below any supplied `measuredMaxHr` or `lactateThresholdHr`. `restingHr` is deliberately *not* checked against `clinicianMaxHr` (a conservative prescribed cap may legitimately sit at or below resting HR), and is checked against an age-estimated max only later, by `calculateZones`.
+
 === CustomZoneBoundary
 
 Explicit zone lower bounds, with optional per-zone labels.
@@ -74,6 +76,8 @@ Explicit zone lower bounds, with optional per-zone labels.
 |`zone5Lower` |`int` |Inclusive lower bound of zone 5 in bpm.
 |`labels` |`List<String>?` |Optional five-element list of effort label strings.
 |===
+
+NOTE: The constructor validates its inputs and throws `ArgumentError` — it is not `const`. Lower bounds must be positive and strictly increasing (`zone1Lower < zone2Lower < ... < zone5Lower`), and `labels`, if supplied, must have exactly five elements.
 
 === ZoneConfiguration
 

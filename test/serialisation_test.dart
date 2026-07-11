@@ -58,7 +58,7 @@ void main() {
   group('CustomZoneBoundary', () {
     test('round-trips without labels', () {
       _roundTrip(
-        const CustomZoneBoundary(
+        CustomZoneBoundary(
           zone1Lower: 100,
           zone2Lower: 120,
           zone3Lower: 140,
@@ -72,7 +72,7 @@ void main() {
 
     test('round-trips with labels', () {
       _roundTrip(
-        const CustomZoneBoundary(
+        CustomZoneBoundary(
           zone1Lower: 100,
           zone2Lower: 120,
           zone3Lower: 140,
@@ -89,7 +89,7 @@ void main() {
   group('HealthProfile', () {
     test('round-trips a fully-populated profile', () {
       _roundTrip(
-        const HealthProfile(
+        HealthProfile(
           age: 42,
           restingHr: 55,
           clinicianMaxHr: 175,
@@ -114,7 +114,7 @@ void main() {
 
     test('round-trips a minimal profile', () {
       _roundTrip(
-        const HealthProfile(age: 30),
+        HealthProfile(age: 30),
         (p) => p.toJson(),
         HealthProfile.fromJson,
       );
@@ -122,7 +122,7 @@ void main() {
 
     test('enum is serialised by name, not ordinal', () {
       expect(
-        const HealthProfile(age: 30, maxHrFormula: MaxHrFormula.astrand)
+        HealthProfile(age: 30, maxHrFormula: MaxHrFormula.astrand)
             .toJson()['maxHrFormula'],
         'astrand',
       );
@@ -130,7 +130,7 @@ void main() {
 
     test('fromJson tolerates an empty map with sensible defaults', () {
       final p = HealthProfile.fromJson(const {});
-      expect(p, const HealthProfile());
+      expect(p, HealthProfile());
       expect(p.betaBlocker, isFalse);
       expect(p.maxHrFormula, MaxHrFormula.tanaka);
     });
@@ -198,19 +198,19 @@ void main() {
 
   group('ZoneConfiguration', () {
     test('round-trips a real calculated configuration', () {
-      final config = calculateZones(const HealthProfile(age: 40))!;
+      final config = calculateZones(HealthProfile(age: 40))!;
       _roundTrip(config, (c) => c.toJson(), ZoneConfiguration.fromJson);
     });
 
     test('round-trips an LTHR/Friel configuration (upperPercent > 1.0)', () {
       final config = calculateZones(
-        const HealthProfile(age: 40, lactateThresholdHr: 160),
+        HealthProfile(age: 40, lactateThresholdHr: 160),
       )!;
       _roundTrip(config, (c) => c.toJson(), ZoneConfiguration.fromJson);
     });
 
     test('method and reliability are serialised by name', () {
-      final config = calculateZones(const HealthProfile(age: 40))!;
+      final config = calculateZones(HealthProfile(age: 40))!;
       final json = config.toJson();
       expect(json['method'], config.method.name);
       expect(json['reliability'], config.reliability.name);
@@ -233,7 +233,7 @@ void main() {
 
     test('ZoneDuration round-trips', () {
       final summary =
-          calculateTimeInZones(readings(), calculateZones(const HealthProfile(age: 40))!);
+          calculateTimeInZones(readings(), calculateZones(HealthProfile(age: 40))!);
       _roundTrip(
         summary.zoneDurations.first,
         (zd) => zd.toJson(),
@@ -243,7 +243,7 @@ void main() {
 
     test('TimeInZoneSummary round-trips (below-zone-1 + recovery)', () {
       final summary =
-          calculateTimeInZones(readings(), calculateZones(const HealthProfile(age: 40))!);
+          calculateTimeInZones(readings(), calculateZones(HealthProfile(age: 40))!);
       // Guard: ensure the fixture actually populated the interesting fields.
       expect(summary.belowZone1Duration, greaterThan(Duration.zero));
       expect(summary.recoveryHrDrop, isNotNull);

@@ -15,7 +15,7 @@ void main() {
       // would receive (Tanaka max 180 → zone 1 starts at 90). Here zone 1
       // starts at 95 and zone 2 at 114, so a 100 bpm reading lands in zone 1
       // instead of zone 2, which is where it would sit under defaults.
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -46,7 +46,7 @@ void main() {
     test(
         'beta-blocker profile produces low-reliability config that still '
         'drives a coherent time-in-zone summary', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 49,
         restingHr: 60,
         betaBlocker: true,
@@ -81,7 +81,7 @@ void main() {
         () {
       // Age 40 Tanaka would estimate max 180, but the clinician has capped at
       // 150. Zone 1 at 50% of 150 = 75, zone 5 at 90% = 135.
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         clinicianMaxHr: 150,
         betaBlocker: true,
@@ -110,7 +110,7 @@ void main() {
   group('LTHR (Friel) pipeline', () {
     test('LTHR profile drives time-in-zone with LTHR-anchored bounds', () {
       // LTHR = 160 → zone 2 lower = 136, zone 4 lower = 152, zone 5 lower = 160.
-      const profile = HealthProfile(lactateThresholdHr: 160);
+      final profile = HealthProfile(lactateThresholdHr: 160);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.lthrFriel);
 
@@ -134,7 +134,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('training load via LTHR pipeline', () {
     test('LTHR config → Edwards TRIMP is positive', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         restingHr: 60,
         lactateThresholdHr: 160,
@@ -164,7 +164,7 @@ void main() {
     test(
         'each interval credits the zone reported by currentZoneFromConfig '
         'for the earlier reading', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final config = calculateZones(profile)!;
 
       final readings = [

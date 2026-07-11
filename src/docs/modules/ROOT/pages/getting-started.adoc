@@ -23,7 +23,7 @@ Or add it manually to `pubspec.yaml` and run `dart pub get`:
 [source,yaml]
 ----
 dependencies:
-  hr_zones: ^0.0.3
+  hr_zones: ^0.1.0
 ----
 
 [source,bash]

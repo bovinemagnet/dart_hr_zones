@@ -2,9 +2,162 @@ import 'package:hr_zones/hr_zones.dart';
 import 'package:test/test.dart';
 
 void main() {
+  // -------------------------------------------------------------------------
+  // Construction-time validation. Profiles are typically built from user input
+  // at runtime, where `assert` is stripped in release AOT builds — so
+  // impossible inputs are rejected with ArgumentError from the constructor
+  // rather than being allowed to produce nonsensical zones downstream.
+  // -------------------------------------------------------------------------
+  group('HealthProfile validation', () {
+    test('non-positive age throws ArgumentError', () {
+      expect(() => HealthProfile(age: 0), throwsArgumentError);
+      expect(() => HealthProfile(age: -1), throwsArgumentError);
+    });
+
+    test('non-positive heart rate fields throw ArgumentError', () {
+      expect(() => HealthProfile(restingHr: 0), throwsArgumentError);
+      expect(() => HealthProfile(measuredMaxHr: -5), throwsArgumentError);
+      expect(() => HealthProfile(clinicianMaxHr: 0), throwsArgumentError);
+      expect(() => HealthProfile(lactateThresholdHr: -2), throwsArgumentError);
+    });
+
+    test('restingHr at or above measuredMaxHr throws ArgumentError', () {
+      expect(
+        () => HealthProfile(measuredMaxHr: 120, restingHr: 130),
+        throwsArgumentError,
+      );
+      expect(
+        () => HealthProfile(measuredMaxHr: 120, restingHr: 120),
+        throwsArgumentError,
+      );
+    });
+
+    test('restingHr at or above lactateThresholdHr throws ArgumentError', () {
+      expect(
+        () => HealthProfile(lactateThresholdHr: 150, restingHr: 155),
+        throwsArgumentError,
+      );
+    });
+
+    test('restingHr at or above clinicianMaxHr is accepted', () {
+      // A conservative prescribed cap may legitimately sit at or below resting
+      // HR; calculateZones degrades to flat percentage bands rather than
+      // failing, so the constructor must not reject this.
+      expect(
+        () => HealthProfile(clinicianMaxHr: 120, restingHr: 130),
+        returnsNormally,
+      );
+    });
+
+    test('resting HR above an age-estimated max is not rejected here', () {
+      // The estimated max depends on the resolution order (a measured max can
+      // outrank the age estimate), so that consistency check belongs to
+      // calculateZones, not the constructor.
+      expect(() => HealthProfile(age: 60, restingHr: 170), returnsNormally);
+    });
+
+    test('error message names the offending field', () {
+      expect(
+        () => HealthProfile(age: -1),
+        throwsA(isA<ArgumentError>().having((e) => e.name, 'name', 'age')),
+      );
+    });
+
+    test('a plausible profile is accepted', () {
+      final profile = HealthProfile(
+        age: 40,
+        restingHr: 55,
+        measuredMaxHr: 185,
+        lactateThresholdHr: 165,
+      );
+      expect(profile.age, 40);
+      expect(profile.restingHr, 55);
+    });
+
+    test('copyWith validates the resulting profile', () {
+      final profile = HealthProfile(measuredMaxHr: 180, restingHr: 50);
+      expect(() => profile.copyWith(restingHr: 190), throwsArgumentError);
+    });
+
+    test('fromJson validates the decoded profile', () {
+      expect(
+        () => HealthProfile.fromJson(const {'age': -1}),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('CustomZoneBoundary validation', () {
+    test('non-positive lower bounds throw ArgumentError', () {
+      expect(
+        () => CustomZoneBoundary(
+          zone1Lower: 0,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('non-monotonic lower bounds throw ArgumentError', () {
+      expect(
+        () => CustomZoneBoundary(
+          zone1Lower: 171,
+          zone2Lower: 152,
+          zone3Lower: 133,
+          zone4Lower: 114,
+          zone5Lower: 95,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('equal adjacent lower bounds throw ArgumentError', () {
+      expect(
+        () => CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 114,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('labels length other than five throws ArgumentError', () {
+      expect(
+        () => CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+          labels: const ['a', 'b'],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('strictly increasing positive bounds are accepted', () {
+      expect(
+        () => CustomZoneBoundary(
+          zone1Lower: 95,
+          zone2Lower: 114,
+          zone3Lower: 133,
+          zone4Lower: 152,
+          zone5Lower: 171,
+        ),
+        returnsNormally,
+      );
+    });
+  });
+
   group('HealthProfile', () {
     test('default values', () {
-      const profile = HealthProfile();
+      final profile = HealthProfile();
       expect(profile.age, isNull);
       expect(profile.restingHr, isNull);
       expect(profile.measuredMaxHr, isNull);
@@ -17,45 +170,45 @@ void main() {
     });
 
     test('isCautionMode true when betaBlocker is set', () {
-      const profile = HealthProfile(betaBlocker: true);
+      final profile = HealthProfile(betaBlocker: true);
       expect(profile.isCautionMode, isTrue);
     });
 
     test('isCautionMode true when heartCondition is set', () {
-      const profile = HealthProfile(heartCondition: true);
+      final profile = HealthProfile(heartCondition: true);
       expect(profile.isCautionMode, isTrue);
     });
 
     test('isCautionMode false when neither flag is set', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       expect(profile.isCautionMode, isFalse);
     });
 
     test('estimatedMaxHr uses Tanaka by default (208 − 0.7 × age)', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       // 208 - 0.7*40 = 180
       expect(profile.estimatedMaxHr, 180);
     });
 
     test('estimatedMaxHr is null when age is null', () {
-      const profile = HealthProfile();
+      final profile = HealthProfile();
       expect(profile.estimatedMaxHr, isNull);
     });
 
     test('estimatedMaxHr respects fox220 formula', () {
-      const profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.fox220);
+      final profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.fox220);
       expect(profile.estimatedMaxHr, 190);
     });
 
     test('estimatedMaxHr respects nes formula', () {
-      const profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
+      final profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
       // 211 - 0.64*30 = 191.8 → 192
       expect(profile.estimatedMaxHr, 192);
     });
 
     test('Tanaka at age 30 differs from Fox 220', () {
-      const tanakaProfile = HealthProfile(age: 30);
-      const foxProfile = HealthProfile(
+      final tanakaProfile = HealthProfile(age: 30);
+      final foxProfile = HealthProfile(
         age: 30,
         maxHrFormula: MaxHrFormula.fox220,
       );
@@ -65,7 +218,7 @@ void main() {
     });
 
     test('copyWith preserves formula', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 30,
         maxHrFormula: MaxHrFormula.nes,
       );
@@ -74,41 +227,41 @@ void main() {
     });
 
     test('copyWith can change formula', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final copy = profile.copyWith(maxHrFormula: MaxHrFormula.fox220);
       expect(copy.maxHrFormula, MaxHrFormula.fox220);
       expect(copy.age, 30);
     });
 
     test('copyWith clearRestingHr resets to null', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final copy = profile.copyWith(clearRestingHr: true);
       expect(copy.restingHr, isNull);
       expect(copy.age, 40);
     });
 
     test('copyWith clearAge resets age', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final copy = profile.copyWith(clearAge: true);
       expect(copy.age, isNull);
       expect(copy.restingHr, 60);
     });
 
     test('copyWith clearClinicianMaxHr resets clinician cap', () {
-      const profile = HealthProfile(age: 40, clinicianMaxHr: 150);
+      final profile = HealthProfile(age: 40, clinicianMaxHr: 150);
       final copy = profile.copyWith(clearClinicianMaxHr: true);
       expect(copy.clinicianMaxHr, isNull);
       expect(copy.age, 40);
     });
 
     test('copyWith clearMeasuredMaxHr resets measured max', () {
-      const profile = HealthProfile(measuredMaxHr: 185);
+      final profile = HealthProfile(measuredMaxHr: 185);
       final copy = profile.copyWith(clearMeasuredMaxHr: true);
       expect(copy.measuredMaxHr, isNull);
     });
 
     test('copyWith clearCustomZones resets custom zones', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -122,7 +275,7 @@ void main() {
     });
 
     test('copyWith can set betaBlocker / heartCondition', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final beta = profile.copyWith(betaBlocker: true);
       expect(beta.betaBlocker, isTrue);
       expect(beta.isCautionMode, isTrue);
@@ -134,12 +287,12 @@ void main() {
     });
 
     test('isCautionMode true when both flags set', () {
-      const profile = HealthProfile(betaBlocker: true, heartCondition: true);
+      final profile = HealthProfile(betaBlocker: true, heartCondition: true);
       expect(profile.isCautionMode, isTrue);
     });
 
     test('toString surfaces key fields', () {
-      const profile = HealthProfile(age: 42, restingHr: 58, betaBlocker: true);
+      final profile = HealthProfile(age: 42, restingHr: 58, betaBlocker: true);
       final s = profile.toString();
       expect(s, contains('42'));
       expect(s, contains('58'));
@@ -195,7 +348,7 @@ void main() {
 
   group('CustomZoneBoundary', () {
     test('stores all boundaries', () {
-      const boundary = CustomZoneBoundary(
+      final boundary = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
@@ -208,7 +361,7 @@ void main() {
     });
 
     test('stores optional labels', () {
-      const boundary = CustomZoneBoundary(
+      final boundary = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
@@ -221,14 +374,14 @@ void main() {
     });
 
     test('equality with and without labels', () {
-      const a = CustomZoneBoundary(
+      final a = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
         zone4Lower: 152,
         zone5Lower: 171,
       );
-      const b = CustomZoneBoundary(
+      final b = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
@@ -238,7 +391,7 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
 
-      const c = CustomZoneBoundary(
+      final c = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
@@ -250,14 +403,14 @@ void main() {
     });
 
     test('inequality when a single boundary differs', () {
-      const a = CustomZoneBoundary(
+      final a = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,
         zone4Lower: 152,
         zone5Lower: 171,
       );
-      const b = CustomZoneBoundary(
+      final b = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 115, // differs
         zone3Lower: 133,
@@ -268,7 +421,7 @@ void main() {
     });
 
     test('toString lists every boundary', () {
-      const boundary = CustomZoneBoundary(
+      final boundary = CustomZoneBoundary(
         zone1Lower: 95,
         zone2Lower: 114,
         zone3Lower: 133,

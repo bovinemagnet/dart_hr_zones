@@ -28,3 +28,5 @@ doc/api/
 .flutter-plugins
 .flutter-plugins-dependencies
 CLAUDE.md
+.codex
+AGENTS.md

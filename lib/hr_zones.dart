@@ -1,8 +1,9 @@
 /// Heart rate zone calculation for Dart and Flutter apps.
 ///
-/// The package provides five calculation methods — custom zones, clinician cap,
-/// HRR/Karvonen, percent-of-measured-max, and percent-of-estimated-max — with
-/// automatic priority selection, reliability grading, and time-in-zone analysis.
+/// The package provides six calculation methods — custom zones, clinician cap,
+/// LTHR (Friel), HRR/Karvonen, percent-of-measured-max, and
+/// percent-of-estimated-max — with automatic priority selection, reliability
+/// grading, and time-in-zone analysis.
 ///
 /// ## Quick start
 ///

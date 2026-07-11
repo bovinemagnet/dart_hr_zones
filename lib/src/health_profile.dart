@@ -85,8 +85,8 @@ extension MaxHrFormulaApply on MaxHrFormula {
 /// Each zone is defined by its lower bound (inclusive) in beats per minute.
 /// The upper bound of a zone is implicitly the lower bound of the next zone
 /// (or [zone5Lower] for zone 5, which extends to max HR). The lower bounds
-/// must be strictly increasing; `calculateZones` throws [ArgumentError]
-/// otherwise.
+/// must be positive and strictly increasing; the constructor throws
+/// [ArgumentError] otherwise.
 ///
 /// Optionally, [labels] supplies a human-readable effort label for each of
 /// the five zones (e.g. `['Marathon', 'Endurance', 'Tempo', 'Threshold',
@@ -116,14 +116,56 @@ class CustomZoneBoundary {
   final List<String>? labels;
 
   /// Creates a [CustomZoneBoundary].
-  const CustomZoneBoundary({
+  ///
+  /// Throws [ArgumentError] when any lower bound is not positive, when the
+  /// bounds are not strictly increasing, or when [labels] is supplied with a
+  /// length other than five.
+  CustomZoneBoundary({
     required this.zone1Lower,
     required this.zone2Lower,
     required this.zone3Lower,
     required this.zone4Lower,
     required this.zone5Lower,
     this.labels,
-  });
+  }) {
+    const names = [
+      'zone1Lower',
+      'zone2Lower',
+      'zone3Lower',
+      'zone4Lower',
+      'zone5Lower',
+    ];
+    final lowers = [zone1Lower, zone2Lower, zone3Lower, zone4Lower, zone5Lower];
+    for (var i = 0; i < lowers.length; i++) {
+      if (lowers[i] <= 0) {
+        throw ArgumentError.value(
+          lowers[i],
+          names[i],
+          'zone lower bounds must be greater than zero',
+        );
+      }
+    }
+    for (var i = 0; i < lowers.length - 1; i++) {
+      if (lowers[i] >= lowers[i + 1]) {
+        throw ArgumentError.value(
+          lowers[i + 1],
+          names[i + 1],
+          'zone lower bounds must be strictly increasing, but '
+              '${names[i]} (${lowers[i]} bpm) >= '
+              '${names[i + 1]} (${lowers[i + 1]} bpm)',
+        );
+      }
+    }
+    final effectiveLabels = labels;
+    if (effectiveLabels != null && effectiveLabels.length != 5) {
+      throw ArgumentError.value(
+        effectiveLabels,
+        'labels',
+        'custom zone labels must have exactly 5 entries when provided, '
+            'but got ${effectiveLabels.length}',
+      );
+    }
+  }
 
   /// Serialises these boundaries to a JSON-compatible map.
   ///
@@ -192,8 +234,16 @@ class CustomZoneBoundary {
 /// Provide as many fields as are known; the calculator uses a priority chain
 /// to select the most reliable method available.
 ///
-/// Values are assumed to be physiologically plausible (positive age,
-/// realistic heart rates); the profile performs no validation itself.
+/// Impossible inputs are rejected at construction with [ArgumentError]: every
+/// supplied age or heart rate must be positive, and [restingHr] must sit
+/// strictly below any supplied [measuredMaxHr] or [lactateThresholdHr].
+///
+/// Two related checks deliberately live elsewhere. [restingHr] against an
+/// *age-estimated* maximum is checked by `calculateZones`, because a measured
+/// maximum can outrank the age estimate. [restingHr] is not checked against
+/// [clinicianMaxHr] at all — a conservative prescribed cap may legitimately
+/// sit at or below resting HR, and `calculateZones` degrades to flat
+/// percentage bands rather than failing.
 class HealthProfile {
   /// Age in years. Used to estimate maximum heart rate via [maxHrFormula]
   /// when no measured maximum is available.
@@ -248,7 +298,11 @@ class HealthProfile {
   final MaxHrFormula maxHrFormula;
 
   /// Creates a [HealthProfile].
-  const HealthProfile({
+  ///
+  /// Throws [ArgumentError] when any supplied age or heart rate is not
+  /// positive, or when [restingHr] is not strictly below a supplied
+  /// [measuredMaxHr] or [lactateThresholdHr].
+  HealthProfile({
     this.age,
     this.restingHr,
     this.clinicianMaxHr,
@@ -258,7 +312,40 @@ class HealthProfile {
     this.heartCondition = false,
     this.customZones,
     this.maxHrFormula = MaxHrFormula.tanaka,
-  });
+  }) {
+    _requirePositive(age, 'age');
+    _requirePositive(restingHr, 'restingHr');
+    _requirePositive(clinicianMaxHr, 'clinicianMaxHr');
+    _requirePositive(measuredMaxHr, 'measuredMaxHr');
+    _requirePositive(lactateThresholdHr, 'lactateThresholdHr');
+
+    // Deliberately not checked against clinicianMaxHr: a conservative
+    // prescribed cap may legitimately sit at or below resting HR, and
+    // calculateZones degrades to flat percentage bands for that case.
+    _requireRestingBelow(measuredMaxHr, 'measuredMaxHr');
+    _requireRestingBelow(lactateThresholdHr, 'lactateThresholdHr');
+  }
+
+  /// Throws [ArgumentError] when [value] is supplied but not positive.
+  static void _requirePositive(int? value, String name) {
+    if (value != null && value <= 0) {
+      throw ArgumentError.value(value, name, '$name must be greater than zero');
+    }
+  }
+
+  /// Throws [ArgumentError] when [restingHr] is not strictly below the supplied
+  /// [ceiling], which would leave no usable heart-rate reserve.
+  void _requireRestingBelow(int? ceiling, String name) {
+    final resting = restingHr;
+    if (resting != null && ceiling != null && resting >= ceiling) {
+      throw ArgumentError.value(
+        resting,
+        'restingHr',
+        'resting heart rate ($resting bpm) must be below $name '
+            '($ceiling bpm); the profile data is inconsistent',
+      );
+    }
+  }
 
   /// Whether caution mode is active (beta-blocker or heart condition).
   bool get isCautionMode => betaBlocker || heartCondition;

@@ -4,7 +4,7 @@
 [![CI](https://github.com/bovinemagnet/dart_hr_zones/actions/workflows/ci.yaml/badge.svg)](https://github.com/bovinemagnet/dart_hr_zones/actions/workflows/ci.yaml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A **pure-Dart** heart rate zone calculator with five calculation methods,
+A **pure-Dart** heart rate zone calculator with six calculation methods,
 automatic priority selection, reliability grading, and time-in-zone analysis.
 
 Zero runtime dependencies. Works with every Dart target — Flutter, server,
@@ -383,7 +383,7 @@ and null optional fields are omitted. Every type round-trips:
 
 ```yaml
 dependencies:
-  hr_zones: ^0.0.3
+  hr_zones: ^0.1.0
 ```
 
 ```bash
