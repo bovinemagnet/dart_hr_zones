@@ -20,16 +20,17 @@ class ZoneDuration {
   ///
   /// [duration] is stored as integer microseconds.
   Map<String, dynamic> toJson() => {
-        'zone': zone.toJson(),
-        'durationMicroseconds': duration.inMicroseconds,
-      };
+    'zone': zone.toJson(),
+    'durationMicroseconds': duration.inMicroseconds,
+  };
 
   /// Reconstructs a [ZoneDuration] from a [toJson] map.
   factory ZoneDuration.fromJson(Map<String, dynamic> json) => ZoneDuration(
-        zone: CalculatedZone.fromJson((json['zone'] as Map).cast<String, dynamic>()),
-        duration:
-            Duration(microseconds: json['durationMicroseconds'] as int),
-      );
+    zone: CalculatedZone.fromJson(
+      (json['zone'] as Map).cast<String, dynamic>(),
+    ),
+    duration: Duration(microseconds: json['durationMicroseconds'] as int),
+  );
 
   @override
   String toString() =>
@@ -114,29 +115,34 @@ class TimeInZoneSummary {
   /// Durations are stored as integer microseconds; `recoveryHrDrop` is
   /// omitted when `null`.
   Map<String, dynamic> toJson() => {
-        'zoneDurations': zoneDurations.map((zd) => zd.toJson()).toList(),
-        'moderateOrHigherDurationMicroseconds':
-            moderateOrHigherDuration.inMicroseconds,
-        'belowZone1DurationMicroseconds': belowZone1Duration.inMicroseconds,
-        if (recoveryHrDrop != null) 'recoveryHrDrop': recoveryHrDrop,
-      };
+    'zoneDurations': zoneDurations.map((zd) => zd.toJson()).toList(),
+    'moderateOrHigherDurationMicroseconds':
+        moderateOrHigherDuration.inMicroseconds,
+    'belowZone1DurationMicroseconds': belowZone1Duration.inMicroseconds,
+    if (recoveryHrDrop != null) 'recoveryHrDrop': recoveryHrDrop,
+  };
 
   /// Reconstructs a [TimeInZoneSummary] from a [toJson] map.
   factory TimeInZoneSummary.fromJson(Map<String, dynamic> json) =>
       TimeInZoneSummary(
         zoneDurations: (json['zoneDurations'] as List<dynamic>)
-            .map((zd) =>
-                ZoneDuration.fromJson((zd as Map).cast<String, dynamic>()))
+            .map(
+              (zd) =>
+                  ZoneDuration.fromJson((zd as Map).cast<String, dynamic>()),
+            )
             .toList(),
         moderateOrHigherDuration: Duration(
-            microseconds: json['moderateOrHigherDurationMicroseconds'] as int),
+          microseconds: json['moderateOrHigherDurationMicroseconds'] as int,
+        ),
         belowZone1Duration: Duration(
-            microseconds: json['belowZone1DurationMicroseconds'] as int),
+          microseconds: json['belowZone1DurationMicroseconds'] as int,
+        ),
         recoveryHrDrop: json['recoveryHrDrop'] as int?,
       );
 
   @override
-  String toString() => 'TimeInZoneSummary('
+  String toString() =>
+      'TimeInZoneSummary('
       'moderateOrHigher: $moderateOrHigherDuration, '
       'belowZone1: $belowZone1Duration, '
       'recoveryHrDrop: $recoveryHrDrop, '
@@ -162,11 +168,11 @@ class TimeInZoneSummary {
 
   @override
   int get hashCode => Object.hash(
-        Object.hashAll(zoneDurations),
-        moderateOrHigherDuration,
-        belowZone1Duration,
-        recoveryHrDrop,
-      );
+    Object.hashAll(zoneDurations),
+    moderateOrHigherDuration,
+    belowZone1Duration,
+    recoveryHrDrop,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -245,8 +251,9 @@ TimeInZoneSummary calculateTimeInZones(
     final gap = last.elapsed - penultimate.elapsed;
     // The explicit flag is authoritative; the gap is a legacy fallback.
     if (last.isRecoverySample || gap >= cooldownGap) {
-      final peakBpm =
-          readings.map((r) => r.bpm).reduce((a, b) => a > b ? a : b);
+      final peakBpm = readings
+          .map((r) => r.bpm)
+          .reduce((a, b) => a > b ? a : b);
       recoveryHrDrop = peakBpm - last.bpm;
     }
   }

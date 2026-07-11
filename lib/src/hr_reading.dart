@@ -32,20 +32,21 @@ class HrReading {
   ///
   /// [elapsed] is stored as integer microseconds under `elapsedMicroseconds`.
   Map<String, dynamic> toJson() => {
-        'bpm': bpm,
-        'elapsedMicroseconds': elapsed.inMicroseconds,
-        'isRecoverySample': isRecoverySample,
-      };
+    'bpm': bpm,
+    'elapsedMicroseconds': elapsed.inMicroseconds,
+    'isRecoverySample': isRecoverySample,
+  };
 
   /// Reconstructs an [HrReading] from a [toJson] map.
   factory HrReading.fromJson(Map<String, dynamic> json) => HrReading(
-        bpm: json['bpm'] as int,
-        elapsed: Duration(microseconds: json['elapsedMicroseconds'] as int),
-        isRecoverySample: json['isRecoverySample'] as bool? ?? false,
-      );
+    bpm: json['bpm'] as int,
+    elapsed: Duration(microseconds: json['elapsedMicroseconds'] as int),
+    isRecoverySample: json['isRecoverySample'] as bool? ?? false,
+  );
 
   @override
-  String toString() => 'HrReading(bpm: $bpm, elapsed: $elapsed'
+  String toString() =>
+      'HrReading(bpm: $bpm, elapsed: $elapsed'
       '${isRecoverySample ? ', recovery' : ''})';
 
   @override

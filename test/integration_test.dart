@@ -43,14 +43,9 @@ void main() {
   // Caution-mode end-to-end
   // -------------------------------------------------------------------------
   group('caution-mode pipeline', () {
-    test(
-        'beta-blocker profile produces low-reliability config that still '
+    test('beta-blocker profile produces low-reliability config that still '
         'drives a coherent time-in-zone summary', () {
-      final profile = HealthProfile(
-        age: 49,
-        restingHr: 60,
-        betaBlocker: true,
-      );
+      final profile = HealthProfile(age: 49, restingHr: 60, betaBlocker: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.hrrKarvonen);
       expect(config.reliability, ZoneReliability.low);
@@ -77,31 +72,33 @@ void main() {
   // Clinician cap with caution flags
   // -------------------------------------------------------------------------
   group('clinician cap with beta-blocker', () {
-    test('time-in-zone uses the clinician-capped max, not the age estimate',
-        () {
-      // Age 40 Tanaka would estimate max 180, but the clinician has capped at
-      // 150. Zone 1 at 50% of 150 = 75, zone 5 at 90% = 135.
-      final profile = HealthProfile(
-        age: 40,
-        clinicianMaxHr: 150,
-        betaBlocker: true,
-      );
-      final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.clinicianCap);
-      expect(config.reliability, ZoneReliability.high);
-      expect(config.maxHr, 150);
-      expect(config.zones[0].lowerBound, 75);
-      expect(config.zones[4].lowerBound, 135);
+    test(
+      'time-in-zone uses the clinician-capped max, not the age estimate',
+      () {
+        // Age 40 Tanaka would estimate max 180, but the clinician has capped at
+        // 150. Zone 1 at 50% of 150 = 75, zone 5 at 90% = 135.
+        final profile = HealthProfile(
+          age: 40,
+          clinicianMaxHr: 150,
+          betaBlocker: true,
+        );
+        final config = calculateZones(profile)!;
+        expect(config.method, ZoneMethod.clinicianCap);
+        expect(config.reliability, ZoneReliability.high);
+        expect(config.maxHr, 150);
+        expect(config.zones[0].lowerBound, 75);
+        expect(config.zones[4].lowerBound, 135);
 
-      final readings = [
-        const HrReading(bpm: 140, elapsed: Duration.zero),
-        const HrReading(bpm: 145, elapsed: Duration(minutes: 8)),
-      ];
-      final summary = calculateTimeInZones(readings, config);
-      // 140 bpm sits in zone 5 (≥ 135), not zone 4 it would hit under the
-      // age-estimated defaults.
-      expect(summary.durationInZone(5), const Duration(minutes: 8));
-    });
+        final readings = [
+          const HrReading(bpm: 140, elapsed: Duration.zero),
+          const HrReading(bpm: 145, elapsed: Duration(minutes: 8)),
+        ];
+        final summary = calculateTimeInZones(readings, config);
+        // 140 bpm sits in zone 5 (≥ 135), not zone 4 it would hit under the
+        // age-estimated defaults.
+        expect(summary.durationInZone(5), const Duration(minutes: 8));
+      },
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -161,8 +158,7 @@ void main() {
   // Consistency: time-in-zone attribution matches currentZoneFromConfig
   // -------------------------------------------------------------------------
   group('per-reading consistency', () {
-    test(
-        'each interval credits the zone reported by currentZoneFromConfig '
+    test('each interval credits the zone reported by currentZoneFromConfig '
         'for the earlier reading', () {
       final profile = HealthProfile(age: 40, restingHr: 60);
       final config = calculateZones(profile)!;

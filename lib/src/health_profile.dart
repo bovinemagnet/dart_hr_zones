@@ -151,8 +151,8 @@ class CustomZoneBoundary {
           lowers[i + 1],
           names[i + 1],
           'zone lower bounds must be strictly increasing, but '
-              '${names[i]} (${lowers[i]} bpm) >= '
-              '${names[i + 1]} (${lowers[i + 1]} bpm)',
+          '${names[i]} (${lowers[i]} bpm) >= '
+          '${names[i + 1]} (${lowers[i + 1]} bpm)',
         );
       }
     }
@@ -171,13 +171,13 @@ class CustomZoneBoundary {
   ///
   /// `labels` is omitted when `null`.
   Map<String, dynamic> toJson() => {
-        'zone1Lower': zone1Lower,
-        'zone2Lower': zone2Lower,
-        'zone3Lower': zone3Lower,
-        'zone4Lower': zone4Lower,
-        'zone5Lower': zone5Lower,
-        if (labels != null) 'labels': labels,
-      };
+    'zone1Lower': zone1Lower,
+    'zone2Lower': zone2Lower,
+    'zone3Lower': zone3Lower,
+    'zone4Lower': zone4Lower,
+    'zone5Lower': zone5Lower,
+    if (labels != null) 'labels': labels,
+  };
 
   /// Reconstructs a [CustomZoneBoundary] from a [toJson] map.
   factory CustomZoneBoundary.fromJson(Map<String, dynamic> json) =>
@@ -191,7 +191,8 @@ class CustomZoneBoundary {
       );
 
   @override
-  String toString() => 'CustomZoneBoundary('
+  String toString() =>
+      'CustomZoneBoundary('
       'z1: $zone1Lower, z2: $zone2Lower, z3: $zone3Lower, '
       'z4: $zone4Lower, z5: $zone5Lower'
       '${labels != null ? ', labels: $labels' : ''})';
@@ -220,13 +221,13 @@ class CustomZoneBoundary {
 
   @override
   int get hashCode => Object.hash(
-        zone1Lower,
-        zone2Lower,
-        zone3Lower,
-        zone4Lower,
-        zone5Lower,
-        labels == null ? 0 : Object.hashAll(labels!),
-      );
+    zone1Lower,
+    zone2Lower,
+    zone3Lower,
+    zone4Lower,
+    zone5Lower,
+    labels == null ? 0 : Object.hashAll(labels!),
+  );
 }
 
 /// Input model describing the health profile used to calculate heart rate zones.
@@ -380,10 +381,12 @@ class HealthProfile {
     return HealthProfile(
       age: clearAge ? null : (age ?? this.age),
       restingHr: clearRestingHr ? null : (restingHr ?? this.restingHr),
-      clinicianMaxHr:
-          clearClinicianMaxHr ? null : (clinicianMaxHr ?? this.clinicianMaxHr),
-      measuredMaxHr:
-          clearMeasuredMaxHr ? null : (measuredMaxHr ?? this.measuredMaxHr),
+      clinicianMaxHr: clearClinicianMaxHr
+          ? null
+          : (clinicianMaxHr ?? this.clinicianMaxHr),
+      measuredMaxHr: clearMeasuredMaxHr
+          ? null
+          : (measuredMaxHr ?? this.measuredMaxHr),
       lactateThresholdHr: clearLactateThresholdHr
           ? null
           : (lactateThresholdHr ?? this.lactateThresholdHr),
@@ -399,37 +402,39 @@ class HealthProfile {
   /// Null optional fields are omitted; [maxHrFormula] is stored by its enum
   /// `name` for forward compatibility.
   Map<String, dynamic> toJson() => {
-        if (age != null) 'age': age,
-        if (restingHr != null) 'restingHr': restingHr,
-        if (clinicianMaxHr != null) 'clinicianMaxHr': clinicianMaxHr,
-        if (measuredMaxHr != null) 'measuredMaxHr': measuredMaxHr,
-        if (lactateThresholdHr != null) 'lactateThresholdHr': lactateThresholdHr,
-        'betaBlocker': betaBlocker,
-        'heartCondition': heartCondition,
-        if (customZones != null) 'customZones': customZones!.toJson(),
-        'maxHrFormula': maxHrFormula.name,
-      };
+    if (age != null) 'age': age,
+    if (restingHr != null) 'restingHr': restingHr,
+    if (clinicianMaxHr != null) 'clinicianMaxHr': clinicianMaxHr,
+    if (measuredMaxHr != null) 'measuredMaxHr': measuredMaxHr,
+    if (lactateThresholdHr != null) 'lactateThresholdHr': lactateThresholdHr,
+    'betaBlocker': betaBlocker,
+    'heartCondition': heartCondition,
+    if (customZones != null) 'customZones': customZones!.toJson(),
+    'maxHrFormula': maxHrFormula.name,
+  };
 
   /// Reconstructs a [HealthProfile] from a [toJson] map.
   factory HealthProfile.fromJson(Map<String, dynamic> json) => HealthProfile(
-        age: json['age'] as int?,
-        restingHr: json['restingHr'] as int?,
-        clinicianMaxHr: json['clinicianMaxHr'] as int?,
-        measuredMaxHr: json['measuredMaxHr'] as int?,
-        lactateThresholdHr: json['lactateThresholdHr'] as int?,
-        betaBlocker: json['betaBlocker'] as bool? ?? false,
-        heartCondition: json['heartCondition'] as bool? ?? false,
-        customZones: json['customZones'] == null
-            ? null
-            : CustomZoneBoundary.fromJson(
-                (json['customZones'] as Map).cast<String, dynamic>()),
-        maxHrFormula: json['maxHrFormula'] == null
-            ? MaxHrFormula.tanaka
-            : MaxHrFormula.values.byName(json['maxHrFormula'] as String),
-      );
+    age: json['age'] as int?,
+    restingHr: json['restingHr'] as int?,
+    clinicianMaxHr: json['clinicianMaxHr'] as int?,
+    measuredMaxHr: json['measuredMaxHr'] as int?,
+    lactateThresholdHr: json['lactateThresholdHr'] as int?,
+    betaBlocker: json['betaBlocker'] as bool? ?? false,
+    heartCondition: json['heartCondition'] as bool? ?? false,
+    customZones: json['customZones'] == null
+        ? null
+        : CustomZoneBoundary.fromJson(
+            (json['customZones'] as Map).cast<String, dynamic>(),
+          ),
+    maxHrFormula: json['maxHrFormula'] == null
+        ? MaxHrFormula.tanaka
+        : MaxHrFormula.values.byName(json['maxHrFormula'] as String),
+  );
 
   @override
-  String toString() => 'HealthProfile('
+  String toString() =>
+      'HealthProfile('
       'age: $age, restingHr: $restingHr, measuredMaxHr: $measuredMaxHr, '
       'clinicianMaxHr: $clinicianMaxHr, '
       'lactateThresholdHr: $lactateThresholdHr, '
@@ -454,14 +459,14 @@ class HealthProfile {
 
   @override
   int get hashCode => Object.hash(
-        age,
-        restingHr,
-        clinicianMaxHr,
-        measuredMaxHr,
-        lactateThresholdHr,
-        betaBlocker,
-        heartCondition,
-        customZones,
-        maxHrFormula,
-      );
+    age,
+    restingHr,
+    clinicianMaxHr,
+    measuredMaxHr,
+    lactateThresholdHr,
+    betaBlocker,
+    heartCondition,
+    customZones,
+    maxHrFormula,
+  );
 }

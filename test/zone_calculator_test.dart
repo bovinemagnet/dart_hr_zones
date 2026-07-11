@@ -225,11 +225,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Caution mode without clinician cap', () {
     test('falls through to hrrKarvonen with low reliability', () {
-      final profile = HealthProfile(
-        age: 49,
-        restingHr: 60,
-        betaBlocker: true,
-      );
+      final profile = HealthProfile(age: 49, restingHr: 60, betaBlocker: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.hrrKarvonen);
       expect(config.reliability, ZoneReliability.low);
@@ -238,10 +234,7 @@ void main() {
     });
 
     test('falls through to percentOfMeasuredMax with low reliability', () {
-      final profile = HealthProfile(
-        measuredMaxHr: 185,
-        heartCondition: true,
-      );
+      final profile = HealthProfile(measuredMaxHr: 185, heartCondition: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.percentOfMeasuredMax);
       expect(config.reliability, ZoneReliability.low);
@@ -406,10 +399,7 @@ void main() {
 
   group('LTHR caution-mode and priority', () {
     test('caution flag + LTHR → lthrFriel, low reliability', () {
-      final profile = HealthProfile(
-        lactateThresholdHr: 155,
-        betaBlocker: true,
-      );
+      final profile = HealthProfile(lactateThresholdHr: 155, betaBlocker: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.lthrFriel);
       expect(config.reliability, ZoneReliability.low);
@@ -557,8 +547,10 @@ void main() {
     });
 
     test('returns null for bpm below zone 1', () {
-      final zone =
-          currentZoneFromConfig(config.zones[0].lowerBound - 10, config);
+      final zone = currentZoneFromConfig(
+        config.zones[0].lowerBound - 10,
+        config,
+      );
       expect(zone, isNull);
     });
 
@@ -680,10 +672,8 @@ void main() {
 
     test('bands length != 5 throws ArgumentError', () {
       expect(
-        () => calculateZones(
-          profile,
-          bands: const [(50.0, 60.0), (60.0, 70.0)],
-        ),
+        () =>
+            calculateZones(profile, bands: const [(50.0, 60.0), (60.0, 70.0)]),
         throwsArgumentError,
       );
     });

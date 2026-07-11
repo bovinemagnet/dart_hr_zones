@@ -20,10 +20,9 @@ void main() {
     });
 
     test('single reading returns zero durations and null drop', () {
-      final summary = calculateTimeInZones(
-        [const HrReading(bpm: 120, elapsed: Duration.zero)],
-        _config(),
-      );
+      final summary = calculateTimeInZones([
+        const HrReading(bpm: 120, elapsed: Duration.zero),
+      ], _config());
       expect(
         summary.zoneDurations.every((zd) => zd.duration == Duration.zero),
         isTrue,
@@ -254,13 +253,10 @@ void main() {
   // -------------------------------------------------------------------------
   group('ZoneDuration.toString', () {
     test('mentions zone number and duration', () {
-      final summary = calculateTimeInZones(
-        [
-          const HrReading(bpm: 95, elapsed: Duration.zero),
-          const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
-        ],
-        _config(),
-      );
+      final summary = calculateTimeInZones([
+        const HrReading(bpm: 95, elapsed: Duration.zero),
+        const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+      ], _config());
       final zone1 = summary.zoneDurations.first;
       expect(zone1.toString(), contains('1'));
       expect(zone1.toString(), contains('0:03:00'));
@@ -272,13 +268,10 @@ void main() {
   // -------------------------------------------------------------------------
   group('TimeInZoneSummary immutability', () {
     test('zoneDurations list is unmodifiable', () {
-      final summary = calculateTimeInZones(
-        [
-          const HrReading(bpm: 95, elapsed: Duration.zero),
-          const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
-        ],
-        _config(),
-      );
+      final summary = calculateTimeInZones([
+        const HrReading(bpm: 95, elapsed: Duration.zero),
+        const HrReading(bpm: 95, elapsed: Duration(minutes: 3)),
+      ], _config());
       expect(() => summary.zoneDurations.clear(), throwsUnsupportedError);
     });
   });
