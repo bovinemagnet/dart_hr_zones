@@ -58,7 +58,10 @@ void main() {
   final liveReadings = <HrReading>[
     for (var s = 0; s <= 300; s++)
       // ignore: prefer_const_constructors — bpm and seconds vary per iteration
-      HrReading(bpm: _bpmAt(s), elapsed: Duration(seconds: s)),
+      HrReading(
+        bpm: _bpmAt(s),
+        elapsed: Duration(seconds: s),
+      ),
   ];
   _printTime(liveReadings, zoneConfig);
 
@@ -90,8 +93,10 @@ void _printConfig(ZoneConfiguration config) {
   print('Reason: ${config.reason}');
   for (final zone in config.zones) {
     final upper = zone.upperBound != null ? '${zone.upperBound! - 1}' : 'max';
-    print('  ${zone.displayLabel.padRight(24)} '
-        '${zone.lowerBound}–$upper bpm');
+    print(
+      '  ${zone.displayLabel.padRight(24)} '
+      '${zone.lowerBound}–$upper bpm',
+    );
   }
   print('');
 }
@@ -102,9 +107,7 @@ void _printTime(List<HrReading> readings, ZoneConfiguration config) {
   print(
     'Recovery HR drop: ${summary.recoveryHrDrop ?? "(no cooldown sample)"}',
   );
-  print(
-    'Moderate-or-higher: ${summary.moderateOrHigherDuration.inSeconds}s',
-  );
+  print('Moderate-or-higher: ${summary.moderateOrHigherDuration.inSeconds}s');
   for (final zd in summary.zoneDurations) {
     final secs = zd.duration.inSeconds;
     final bar = '█' * (secs ~/ 5);

@@ -22,14 +22,10 @@ class BanisterCoefficients {
   const BanisterCoefficients({required this.a, required this.b});
 
   /// Banister's published male coefficients (`a = 0.64`, `b = 1.92`).
-  const BanisterCoefficients.male()
-      : a = 0.64,
-        b = 1.92;
+  const BanisterCoefficients.male() : a = 0.64, b = 1.92;
 
   /// Banister's published female coefficients (`a = 0.86`, `b = 1.67`).
-  const BanisterCoefficients.female()
-      : a = 0.86,
-        b = 1.67;
+  const BanisterCoefficients.female() : a = 0.86, b = 1.67;
 
   /// Serialises these coefficients to a JSON-compatible map.
   Map<String, dynamic> toJson() => {'a': a, 'b': b};

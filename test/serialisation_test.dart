@@ -49,8 +49,10 @@ void main() {
     });
 
     test('elapsed is stored losslessly as microseconds', () {
-      const reading =
-          HrReading(bpm: 100, elapsed: Duration(microseconds: 1234567));
+      const reading = HrReading(
+        bpm: 100,
+        elapsed: Duration(microseconds: 1234567),
+      );
       expect(reading.toJson()['elapsedMicroseconds'], 1234567);
     });
   });
@@ -122,8 +124,10 @@ void main() {
 
     test('enum is serialised by name, not ordinal', () {
       expect(
-        HealthProfile(age: 30, maxHrFormula: MaxHrFormula.astrand)
-            .toJson()['maxHrFormula'],
+        HealthProfile(
+          age: 30,
+          maxHrFormula: MaxHrFormula.astrand,
+        ).toJson()['maxHrFormula'],
         'astrand',
       );
     });
@@ -221,19 +225,21 @@ void main() {
     // Readings that spend time below zone 1, inside zones, and end with an
     // explicit recovery sample — exercises every field of the summary.
     List<HrReading> readings() => const [
-          HrReading(bpm: 70, elapsed: Duration.zero), // below zone 1
-          HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
-          HrReading(bpm: 165, elapsed: Duration(minutes: 20)),
-          HrReading(
-            bpm: 100,
-            elapsed: Duration(minutes: 22),
-            isRecoverySample: true,
-          ),
-        ];
+      HrReading(bpm: 70, elapsed: Duration.zero), // below zone 1
+      HrReading(bpm: 130, elapsed: Duration(minutes: 5)),
+      HrReading(bpm: 165, elapsed: Duration(minutes: 20)),
+      HrReading(
+        bpm: 100,
+        elapsed: Duration(minutes: 22),
+        isRecoverySample: true,
+      ),
+    ];
 
     test('ZoneDuration round-trips', () {
-      final summary =
-          calculateTimeInZones(readings(), calculateZones(HealthProfile(age: 40))!);
+      final summary = calculateTimeInZones(
+        readings(),
+        calculateZones(HealthProfile(age: 40))!,
+      );
       _roundTrip(
         summary.zoneDurations.first,
         (zd) => zd.toJson(),
@@ -242,8 +248,10 @@ void main() {
     });
 
     test('TimeInZoneSummary round-trips (below-zone-1 + recovery)', () {
-      final summary =
-          calculateTimeInZones(readings(), calculateZones(HealthProfile(age: 40))!);
+      final summary = calculateTimeInZones(
+        readings(),
+        calculateZones(HealthProfile(age: 40))!,
+      );
       // Guard: ensure the fixture actually populated the interesting fields.
       expect(summary.belowZone1Duration, greaterThan(Duration.zero));
       expect(summary.recoveryHrDrop, isNotNull);

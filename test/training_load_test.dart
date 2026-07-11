@@ -60,10 +60,9 @@ void main() {
       final profile = HealthProfile(age: 40, restingHr: 60);
       expect(calculateBanisterTrimp(const [], profile), 0.0);
       expect(
-        calculateBanisterTrimp(
-          const [HrReading(bpm: 120, elapsed: Duration.zero)],
-          profile,
-        ),
+        calculateBanisterTrimp(const [
+          HrReading(bpm: 120, elapsed: Duration.zero),
+        ], profile),
         0.0,
       );
     });

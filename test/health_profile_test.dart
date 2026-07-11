@@ -218,10 +218,7 @@ void main() {
     });
 
     test('copyWith preserves formula', () {
-      final profile = HealthProfile(
-        age: 30,
-        maxHrFormula: MaxHrFormula.nes,
-      );
+      final profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
       final copy = profile.copyWith(age: 40);
       expect(copy.maxHrFormula, MaxHrFormula.nes);
     });
@@ -333,7 +330,9 @@ void main() {
       expect(MaxHrFormula.millerFaulkner.apply(30), 192); // 217-25.5=191.5→192
       expect(MaxHrFormula.millerFaulkner.apply(40), 183); // 217-34=183
       expect(
-          MaxHrFormula.millerFaulkner.apply(49), 175); // 217-41.65=175.35→175
+        MaxHrFormula.millerFaulkner.apply(49),
+        175,
+      ); // 217-41.65=175.35→175
     });
 
     test('displayName is human readable', () {

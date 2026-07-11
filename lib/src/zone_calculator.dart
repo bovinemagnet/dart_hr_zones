@@ -118,32 +118,33 @@ class CalculatedZone {
   ///
   /// `upperBound` is omitted for the open-ended top zone.
   Map<String, dynamic> toJson() => {
-        'zoneNumber': zoneNumber,
-        'label': label,
-        'effortLabel': effortLabel,
-        'descriptiveLabel': descriptiveLabel,
-        'lowerBound': lowerBound,
-        if (upperBound != null) 'upperBound': upperBound,
-        'color': color,
-        'lowerPercent': lowerPercent,
-        'upperPercent': upperPercent,
-      };
+    'zoneNumber': zoneNumber,
+    'label': label,
+    'effortLabel': effortLabel,
+    'descriptiveLabel': descriptiveLabel,
+    'lowerBound': lowerBound,
+    if (upperBound != null) 'upperBound': upperBound,
+    'color': color,
+    'lowerPercent': lowerPercent,
+    'upperPercent': upperPercent,
+  };
 
   /// Reconstructs a [CalculatedZone] from a [toJson] map.
   factory CalculatedZone.fromJson(Map<String, dynamic> json) => CalculatedZone(
-        zoneNumber: json['zoneNumber'] as int,
-        label: json['label'] as String,
-        effortLabel: json['effortLabel'] as String,
-        descriptiveLabel: json['descriptiveLabel'] as String,
-        lowerBound: json['lowerBound'] as int,
-        upperBound: json['upperBound'] as int?,
-        color: json['color'] as int,
-        lowerPercent: (json['lowerPercent'] as num).toDouble(),
-        upperPercent: (json['upperPercent'] as num).toDouble(),
-      );
+    zoneNumber: json['zoneNumber'] as int,
+    label: json['label'] as String,
+    effortLabel: json['effortLabel'] as String,
+    descriptiveLabel: json['descriptiveLabel'] as String,
+    lowerBound: json['lowerBound'] as int,
+    upperBound: json['upperBound'] as int?,
+    color: json['color'] as int,
+    lowerPercent: (json['lowerPercent'] as num).toDouble(),
+    upperPercent: (json['upperPercent'] as num).toDouble(),
+  );
 
   @override
-  String toString() => 'CalculatedZone($zoneNumber: $lowerBound'
+  String toString() =>
+      'CalculatedZone($zoneNumber: $lowerBound'
       '${upperBound != null ? ' – ${upperBound! - 1}' : '+'} bpm)';
 
   @override
@@ -203,26 +204,25 @@ class ZoneConfiguration {
   ///
   /// [method] and [reliability] are stored by their enum `name`.
   Map<String, dynamic> toJson() => {
-        'zones': zones.map((z) => z.toJson()).toList(),
-        'method': method.name,
-        'reliability': reliability.name,
-        'maxHr': maxHr,
-        'reason': reason,
-      };
+    'zones': zones.map((z) => z.toJson()).toList(),
+    'method': method.name,
+    'reliability': reliability.name,
+    'maxHr': maxHr,
+    'reason': reason,
+  };
 
   /// Reconstructs a [ZoneConfiguration] from a [toJson] map.
-  factory ZoneConfiguration.fromJson(Map<String, dynamic> json) =>
-      ZoneConfiguration(
-        zones: (json['zones'] as List<dynamic>)
-            .map((z) =>
-                CalculatedZone.fromJson((z as Map).cast<String, dynamic>()))
-            .toList(),
-        method: ZoneMethod.values.byName(json['method'] as String),
-        reliability:
-            ZoneReliability.values.byName(json['reliability'] as String),
-        maxHr: json['maxHr'] as int,
-        reason: json['reason'] as String,
-      );
+  factory ZoneConfiguration.fromJson(
+    Map<String, dynamic> json,
+  ) => ZoneConfiguration(
+    zones: (json['zones'] as List<dynamic>)
+        .map((z) => CalculatedZone.fromJson((z as Map).cast<String, dynamic>()))
+        .toList(),
+    method: ZoneMethod.values.byName(json['method'] as String),
+    reliability: ZoneReliability.values.byName(json['reliability'] as String),
+    maxHr: json['maxHr'] as int,
+    reason: json['reason'] as String,
+  );
 
   @override
   String toString() =>
@@ -249,13 +249,8 @@ class ZoneConfiguration {
   }
 
   @override
-  int get hashCode => Object.hash(
-        Object.hashAll(zones),
-        method,
-        reliability,
-        maxHr,
-        reason,
-      );
+  int get hashCode =>
+      Object.hash(Object.hashAll(zones), method, reliability, maxHr, reason);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,12 +379,7 @@ ZoneConfiguration? calculateZones(
   // 1. Custom zones
   final custom = profile.customZones;
   if (custom != null) {
-    return _customZones(
-      custom,
-      labels,
-      effectiveEfforts,
-      effectiveColors,
-    );
+    return _customZones(custom, labels, effectiveEfforts, effectiveColors);
   }
 
   // 2. Clinician cap — authoritative. Overrides caution mode; reliability is
@@ -407,7 +397,8 @@ ZoneConfiguration? calculateZones(
         restingHr: clinicianResting,
         method: ZoneMethod.clinicianCap,
         reliability: ZoneReliability.high,
-        reason: 'Using clinician-provided maximum heart rate with heart rate '
+        reason:
+            'Using clinician-provided maximum heart rate with heart rate '
             'reserve (Karvonen) personalisation',
         bands: effectiveBands,
         labels: effectiveLabels,
@@ -434,8 +425,9 @@ ZoneConfiguration? calculateZones(
   // whereas Karvonen may be falling back to an age-estimated max.
   final lthr = profile.lactateThresholdHr;
   if (lthr != null) {
-    final reliability =
-        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.high;
+    final reliability = profile.isCautionMode
+        ? ZoneReliability.low
+        : ZoneReliability.high;
     return _percentOfMaxZones(
       maxHr: lthr,
       method: ZoneMethod.lthrFriel,
@@ -488,8 +480,9 @@ ZoneConfiguration? calculateZones(
   // 5. Percent of measured max
   final measuredMax = profile.measuredMaxHr;
   if (measuredMax != null) {
-    final reliability =
-        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.high;
+    final reliability = profile.isCautionMode
+        ? ZoneReliability.low
+        : ZoneReliability.high;
     return _percentOfMaxZones(
       maxHr: measuredMax,
       method: ZoneMethod.percentOfMeasuredMax,
@@ -506,14 +499,18 @@ ZoneConfiguration? calculateZones(
   // 6. Percent of estimated max (via profile.maxHrFormula)
   final estimated = profile.estimatedMaxHr;
   if (estimated != null) {
-    final reliability =
-        profile.isCautionMode ? ZoneReliability.low : ZoneReliability.medium;
+    final reliability = profile.isCautionMode
+        ? ZoneReliability.low
+        : ZoneReliability.medium;
     return _percentOfMaxZones(
       maxHr: estimated,
       method: ZoneMethod.percentOfEstimatedMax,
       reliability: reliability,
-      reason:
-          _reasonFor(profile, ZoneMethod.percentOfEstimatedMax, reliability),
+      reason: _reasonFor(
+        profile,
+        ZoneMethod.percentOfEstimatedMax,
+        reliability,
+      ),
       bands: effectiveBands,
       labels: effectiveLabels,
       efforts: effectiveEfforts,
@@ -542,7 +539,11 @@ CalculatedZone? currentZoneFromConfig(int bpm, ZoneConfiguration config) {
 /// entries long. Used to enforce the five-zone contract at runtime.
 void _require5(int length, String name) {
   if (length != 5) {
-    throw ArgumentError.value(length, name, '$name must have exactly 5 entries');
+    throw ArgumentError.value(
+      length,
+      name,
+      '$name must have exactly 5 entries',
+    );
   }
 }
 
@@ -612,8 +613,8 @@ ZoneConfiguration _customZones(
     final label = explicitLabels != null
         ? explicitLabels[i]
         : customLabels != null
-            ? 'Zone ${i + 1} – ${customLabels[i]}'
-            : _defaultLabels[i];
+        ? 'Zone ${i + 1} – ${customLabels[i]}'
+        : _defaultLabels[i];
     zones.add(
       CalculatedZone(
         zoneNumber: i + 1,
