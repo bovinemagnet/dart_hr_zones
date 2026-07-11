@@ -8,6 +8,68 @@ This project adheres to https://semver.org/spec/v2.0.0.html[Semantic Versioning]
 
 For the complete raw changelog, see `CHANGELOG.md` in the https://github.com/bovinemagnet/dart_hr_zones[repository].
 
+== 0.1.0 (2026-07-12)
+
+This release contains breaking changes.
+The minor version is bumped (rather than the patch version) to signal that call sites need updating; see the migration note under *Changes*.
+
+=== New features
+
+JSON serialisation::
+`toJson()` and a matching `fromJson` factory are now available on every public value type — `HealthProfile`, `CustomZoneBoundary`, `ZoneConfiguration`, `CalculatedZone`, `HrReading`, `TimeInZoneSummary`, `ZoneDuration`, and `BanisterCoefficients`.
+Uses only `dart:convert` — no code generation, no build step, zero runtime dependencies — and every type round-trips (`fromJson(x.toJson()) == x`).
+Backed by new value `==`/`hashCode` on `HealthProfile`, `ZoneConfiguration`, `TimeInZoneSummary`, `ZoneDuration`, and `BanisterCoefficients` (previously identity-only).
+See xref:serialisation.adoc[JSON Serialisation] for details.
+
+Recovery-sample flag::
+`HrReading.isRecoverySample`, when set on the final reading, tells `calculateTimeInZones` to exclude the preceding cooldown interval from the per-zone totals and populate `recoveryHrDrop` deterministically — avoiding a late sensor dropout being misread as a recovery measurement.
+
+Below-zone-1 duration::
+`TimeInZoneSummary.belowZone1Duration` now surfaces the time whose starting reading fell below zone 1, which was previously discarded without being reported.
+
+=== Changes
+
+Breaking: HealthProfile and CustomZoneBoundary validate at construction::
+Both constructors now validate their inputs and are therefore no longer `const`.
+Call sites written as `const HealthProfile(...)` or `const CustomZoneBoundary(...)` must drop the `const` keyword (use `final` for the local variable).
++
+They throw `ArgumentError` when: any supplied `age`, `restingHr`, `measuredMaxHr`, `clinicianMaxHr`, or `lactateThresholdHr` is not positive; `restingHr` is at or above a supplied `measuredMaxHr` or `lactateThresholdHr`; `CustomZoneBoundary` lower bounds are not positive or not strictly increasing; or `CustomZoneBoundary.labels` is supplied with a length other than five.
++
+Validation moved into the constructors because a profile is typically built from user input at runtime, where `assert` is stripped in release AOT builds — failing at construction also names the offending field, rather than surfacing much later as nonsensical zones.
++
+Two checks deliberately stay outside the constructor. `restingHr` is still checked against an _age-estimated_ max by `calculateZones`, because a measured max can outrank the age estimate. `restingHr` is *not* checked against `clinicianMaxHr` at all — a conservative prescribed cap may legitimately sit at or below resting HR, and `calculateZones` degrades to flat percentage bands for that case.
+
+Breaking: raised the minimum Dart SDK to ^3.8.0::
+Was `^3.4.0`. Matches the `lints: ^6.1.0` dev-dependency, which requires SDK `>=3.8.0`. The CI matrix now tests `3.8.0` and `stable`.
+
+Breaking: calculateZones rejects an inconsistent resting/age-estimated max::
+Throws `ArgumentError` when `restingHr` is at or above the resolved max HR, instead of silently falling through to a percentage method and returning nonsensical zones.
+Where the max is supplied directly the check now happens earlier, in the `HealthProfile` constructor; `calculateZones` retains the check for the age-estimated max, which it alone can resolve.
+
+Clinician cap personalised with Karvonen::
+`calculateZones` now applies the HRR/Karvonen formula to the clinician-cap method when a `restingHr` is available, so the lower zones sit above resting HR instead of a flat percentage that could fall below it.
+`method` remains `ZoneMethod.clinicianCap` and reliability remains `high`.
+
+calculateBanisterTrimp resolves more max HR sources::
+Now resolves the maximum heart rate as `clinicianMaxHr ?? measuredMaxHr ?? estimatedMaxHr`, so clinician-capped profiles get a training-load score instead of `null`.
+
+Override lists and custom bounds validate their length::
+The `bands`/`labels`/`effortLabels`/`descriptiveLabels`/`colors` overrides passed to `calculateZones` now throw `ArgumentError` when their length is not exactly five (previously an `assert`, stripped in release builds).
+`CustomZoneBoundary` lower bounds that are not strictly increasing, and `labels` of a length other than five, now throw `ArgumentError` from the constructor instead of silently building inverted zones or crashing with a bare `RangeError`.
+
+Custom zone label format::
+Custom zone `labels` are now combined into the UI label as `'Zone N – <label>'` (previously the bare label replaced it), and an explicit `labels:` argument to `calculateZones` now takes precedence over `CustomZoneBoundary.labels`.
+
+Unmodifiable result lists::
+`ZoneConfiguration.zones` and `TimeInZoneSummary.zoneDurations` are now unmodifiable lists.
+
+=== Documentation
+
+* Corrected the package description, which described five calculation methods rather than the six now supported — the LTHR/Friel method was missing from the list.
+* Corrected the `CalculatedZone.upperPercent` contract to note that the `ZoneMethod.lthrFriel` top zone can exceed `1.0` (default Friel zone 5 runs to 110% of LTHR).
+* Corrected stale worked examples and expected outputs (Edwards TRIMP, the getting-started version pin and output, Åstrand / Miller–Faulkner formula values, and method `reason` strings).
+* Documented `ZoneConfiguration.maxHr` semantics for custom zones, the dual interpretation of the `bands` parameter (percent-of-max vs percent-of-LTHR), and the input contract on `HealthProfile` and `MaxHrFormula.apply`.
+
 == 0.0.3 (2026-04-17)
 
 A packaging-only release — no library or API changes.

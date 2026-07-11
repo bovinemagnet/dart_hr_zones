@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-07-12
+
+This release contains breaking changes. The minor version is bumped (rather
+than the patch version) to signal that call sites need updating; see the
+migration notes under **Changed**.
 
 ### Added
 
@@ -29,6 +33,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `HealthProfile` and `CustomZoneBoundary` now validate their
+  inputs at construction and are therefore **no longer `const`**. Call sites
+  written as `const HealthProfile(...)` or `const CustomZoneBoundary(...)`
+  must drop the `const` keyword (use `final` for the local variable).
+
+  The constructors throw `ArgumentError` when:
+  - any supplied `age`, `restingHr`, `measuredMaxHr`, `clinicianMaxHr` or
+    `lactateThresholdHr` is not positive;
+  - `restingHr` is at or above a supplied `measuredMaxHr` or
+    `lactateThresholdHr`;
+  - `CustomZoneBoundary` lower bounds are not positive, or are not strictly
+    increasing;
+  - `CustomZoneBoundary.labels` is supplied with a length other than five.
+
+  Validation moved into the constructors because a profile is typically built
+  from user input at runtime, where `assert` is stripped in release AOT
+  builds. Failing at construction also identifies the offending field, rather
+  than surfacing much later as nonsensical zones.
+
+  Two checks deliberately stay outside the constructor. `restingHr` is still
+  checked against an *age-estimated* max by `calculateZones`, because a
+  measured max can outrank the age estimate. `restingHr` is **not** checked
+  against `clinicianMaxHr` at all — a conservative prescribed cap may
+  legitimately sit at or below resting HR, and `calculateZones` degrades to
+  flat percentage bands for that case.
 - **Breaking:** raised the minimum Dart SDK to `^3.8.0` (was `^3.4.0`) to
   match the `lints: ^6.1.0` dev-dependency, which requires SDK `>=3.8.0`.
   The CI matrix now tests `3.8.0` and `stable`. The previous constraint was
@@ -42,18 +71,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `calculateZones` now throws `ArgumentError` when `restingHr`
   is at or above the resolved max HR (an inconsistent profile with no
   heart-rate reserve). Previously it silently fell through to the percentage
-  methods and returned nonsensical zones at high/medium reliability.
+  methods and returned nonsensical zones at high/medium reliability. Where
+  the max is supplied directly the check now happens earlier, in the
+  `HealthProfile` constructor; `calculateZones` retains the check for the
+  age-estimated max, which it alone can resolve.
 - `calculateBanisterTrimp` now resolves the maximum heart rate as
   `clinicianMaxHr ?? measuredMaxHr ?? estimatedMaxHr`, so clinician-capped
   profiles get a training-load score instead of `null`.
 - Override lists (`bands`/`labels`/`effortLabels`/`descriptiveLabels`/
-  `colors`) and `CustomZoneBoundary.labels` now throw `ArgumentError` when
-  their length is not exactly 5. The list-length checks were previously
-  `assert`s (stripped in release builds); custom labels had no check and
-  crashed with a bare `RangeError`.
-- `calculateZones` now throws `ArgumentError` when `CustomZoneBoundary`
-  lower bounds are not strictly increasing, instead of silently building
-  inverted zones that never match any reading.
+  `colors`) passed to `calculateZones` now throw `ArgumentError` when their
+  length is not exactly 5. These checks were previously `assert`s, and so
+  were stripped in release builds.
+- `CustomZoneBoundary` lower bounds that are not strictly increasing, and
+  `labels` of a length other than five, now throw `ArgumentError` from the
+  constructor. Previously the bounds silently built inverted zones that never
+  matched any reading, and short label lists crashed with a bare `RangeError`.
 - Custom zone `labels` are now combined into the UI label as
   `'Zone N – <label>'` (previously the bare label replaced it), and an
   explicit `labels:` argument to `calculateZones` now takes precedence over
@@ -71,8 +103,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Miller–Faulkner formula values, and method `reason` strings).
 - Documented `ZoneConfiguration.maxHr` semantics for custom zones
   (`zone5Lower`), the dual interpretation of the `bands` parameter
-  (percent-of-max vs percent-of-LTHR), and the assumed-valid input contract
-  on `HealthProfile` and `MaxHrFormula.apply`.
+  (percent-of-max vs percent-of-LTHR), and the input contract on
+  `HealthProfile` and `MaxHrFormula.apply`.
+- Corrected the package description, README and library documentation, which
+  described five calculation methods rather than the six now supported (the
+  LTHR / Friel method was missing from the list).
 
 ## [0.0.3] - 2026-04-17
 

@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 /// Shared Tanaka-40 configuration. Zone 1 90-108, Z2 108-126, Z3 126-144,
 /// Z4 144-162, Z5 162+ bpm.
-ZoneConfiguration _config() => calculateZones(const HealthProfile(age: 40))!;
+ZoneConfiguration _config() => calculateZones(HealthProfile(age: 40))!;
 
 void main() {
   // -------------------------------------------------------------------------
@@ -45,19 +45,19 @@ void main() {
   // -------------------------------------------------------------------------
   group('calculateBanisterTrimp', () {
     test('null when restingHr is missing', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final trimp = calculateBanisterTrimp(const [], profile);
       expect(trimp, isNull);
     });
 
     test('null when neither measuredMaxHr nor age is available', () {
-      const profile = HealthProfile(restingHr: 60);
+      final profile = HealthProfile(restingHr: 60);
       final trimp = calculateBanisterTrimp(const [], profile);
       expect(trimp, isNull);
     });
 
     test('0 when readings has fewer than two samples', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       expect(calculateBanisterTrimp(const [], profile), 0.0);
       expect(
         calculateBanisterTrimp(
@@ -73,7 +73,7 @@ void main() {
       // HRR fraction = (120 - 60) / 120 = 0.5.
       // Male weighting = 0.64 × exp(1.92 × 0.5) = 0.64 × exp(0.96).
       // TRIMP = 10 × 0.5 × 0.64 × exp(0.96) ≈ 8.357.
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final readings = [
         const HrReading(bpm: 120, elapsed: Duration.zero),
         const HrReading(bpm: 120, elapsed: Duration(minutes: 10)),
@@ -83,7 +83,7 @@ void main() {
     });
 
     test('male vs female coefficients produce different scores', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final readings = [
         const HrReading(bpm: 150, elapsed: Duration.zero),
         const HrReading(bpm: 150, elapsed: Duration(minutes: 15)),
@@ -98,7 +98,7 @@ void main() {
     });
 
     test('bpm below resting HR is clamped to zero contribution', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final belowRest = [
         const HrReading(bpm: 50, elapsed: Duration.zero),
         const HrReading(bpm: 50, elapsed: Duration(minutes: 10)),
@@ -108,8 +108,8 @@ void main() {
     });
 
     test('uses measuredMaxHr when available instead of age estimate', () {
-      const age40Profile = HealthProfile(age: 40, restingHr: 60);
-      const measuredProfile = HealthProfile(
+      final age40Profile = HealthProfile(age: 40, restingHr: 60);
+      final measuredProfile = HealthProfile(
         age: 40,
         restingHr: 60,
         measuredMaxHr: 200,
@@ -125,7 +125,7 @@ void main() {
     });
 
     test('non-increasing intervals are skipped', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       // Two readings with the same elapsed time produce a zero-length
       // interval that must not contribute. The non-zero interval that
       // follows uses bpm 120 (the earlier of the two remaining readings).
@@ -141,7 +141,7 @@ void main() {
     test('uses clinicianMaxHr when no measured/estimated max (#11)', () {
       // Clinician-capped profile with no age or measured max: calculateZones
       // succeeds for this profile, so TRIMP must not silently return null.
-      const profile = HealthProfile(clinicianMaxHr: 180, restingHr: 60);
+      final profile = HealthProfile(clinicianMaxHr: 180, restingHr: 60);
       final readings = [
         const HrReading(bpm: 120, elapsed: Duration.zero),
         const HrReading(bpm: 120, elapsed: Duration(minutes: 10)),
@@ -153,7 +153,7 @@ void main() {
     });
 
     test('clinicianMaxHr takes priority over measured and estimated max', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         restingHr: 60,
         measuredMaxHr: 200,

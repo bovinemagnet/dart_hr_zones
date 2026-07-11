@@ -7,7 +7,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('calculateZones returns null', () {
     test('when HealthProfile is empty', () {
-      expect(calculateZones(const HealthProfile()), isNull);
+      expect(calculateZones(HealthProfile()), isNull);
     });
   });
 
@@ -18,7 +18,7 @@ void main() {
     late ZoneConfiguration config;
 
     setUp(() {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -59,7 +59,7 @@ void main() {
     });
 
     test('custom labels override effortLabel', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -76,7 +76,7 @@ void main() {
     });
 
     test('explicit labels parameter wins over CustomZoneBoundary.labels', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -96,59 +96,25 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Custom boundary validation — lowers must be strictly increasing
-  // -------------------------------------------------------------------------
-  group('custom boundary validation', () {
-    test('non-monotonic boundaries throw ArgumentError', () {
-      const profile = HealthProfile(
-        customZones: CustomZoneBoundary(
-          zone1Lower: 171,
-          zone2Lower: 152,
-          zone3Lower: 133,
-          zone4Lower: 114,
-          zone5Lower: 95,
-        ),
-      );
-      expect(() => calculateZones(profile), throwsArgumentError);
-    });
-
-    test('equal adjacent boundaries throw ArgumentError', () {
-      const profile = HealthProfile(
-        customZones: CustomZoneBoundary(
-          zone1Lower: 95,
-          zone2Lower: 114,
-          zone3Lower: 114,
-          zone4Lower: 152,
-          zone5Lower: 171,
-        ),
-      );
-      expect(() => calculateZones(profile), throwsArgumentError);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Inconsistent data: restingHr >= resolved max throws rather than emitting
-  // nonsensical zones at high reliability.
+  // Inconsistent data: restingHr >= the resolved max throws rather than
+  // emitting nonsensical zones at high reliability.
+  //
+  // Inputs that are invalid in isolation — non-monotonic custom boundaries, a
+  // restingHr at or above a *supplied* measured max — are now rejected by the
+  // HealthProfile / CustomZoneBoundary constructors, and are covered in
+  // test/health_profile_test.dart. What remains here is the one inconsistency
+  // only calculateZones can detect, because it depends on the resolution
+  // order: restingHr against an age-estimated maximum.
   // -------------------------------------------------------------------------
   group('restingHr at or above the resolved maximum', () {
-    test('restingHr above measured max throws ArgumentError', () {
-      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 130);
-      expect(() => calculateZones(profile), throwsArgumentError);
-    });
-
-    test('restingHr equal to measured max throws ArgumentError', () {
-      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 120);
-      expect(() => calculateZones(profile), throwsArgumentError);
-    });
-
     test('restingHr above age-estimated max throws ArgumentError', () {
       // Tanaka age 60 → 166; resting 170 leaves no reserve.
-      const profile = HealthProfile(age: 60, restingHr: 170);
+      final profile = HealthProfile(age: 60, restingHr: 170);
       expect(() => calculateZones(profile), throwsArgumentError);
     });
 
     test('error message identifies the inconsistency', () {
-      const profile = HealthProfile(measuredMaxHr: 120, restingHr: 130);
+      final profile = HealthProfile(age: 60, restingHr: 170);
       expect(
         () => calculateZones(profile),
         throwsA(
@@ -160,6 +126,17 @@ void main() {
         ),
       );
     });
+
+    test('a measured max outranking the age estimate is not an error', () {
+      // Resting 170 sits above the Tanaka estimate for age 60 (166) but below
+      // the measured max, which wins — so this profile is consistent.
+      final profile = HealthProfile(
+        age: 60,
+        measuredMaxHr: 180,
+        restingHr: 170,
+      );
+      expect(calculateZones(profile)!.maxHr, 180);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -167,7 +144,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('ZoneConfiguration immutability', () {
     test('zones list is unmodifiable', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final config = calculateZones(profile)!;
       expect(() => config.zones.clear(), throwsUnsupportedError);
     });
@@ -180,7 +157,7 @@ void main() {
     late ZoneConfiguration config;
 
     setUp(() {
-      const profile = HealthProfile(clinicianMaxHr: 160);
+      final profile = HealthProfile(clinicianMaxHr: 160);
       config = calculateZones(profile)!;
     });
 
@@ -219,7 +196,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Clinician cap overrides caution mode', () {
     test('betaBlocker + clinician cap → clinicianCap, high reliability', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 49,
         restingHr: 60,
         clinicianMaxHr: 150,
@@ -232,7 +209,7 @@ void main() {
     });
 
     test('heartCondition + clinician cap → clinicianCap, high', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 55,
         clinicianMaxHr: 140,
         heartCondition: true,
@@ -248,7 +225,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Caution mode without clinician cap', () {
     test('falls through to hrrKarvonen with low reliability', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 49,
         restingHr: 60,
         betaBlocker: true,
@@ -261,7 +238,7 @@ void main() {
     });
 
     test('falls through to percentOfMeasuredMax with low reliability', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         measuredMaxHr: 185,
         heartCondition: true,
       );
@@ -272,7 +249,7 @@ void main() {
     });
 
     test('reason lists both flags when both set', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         betaBlocker: true,
         heartCondition: true,
@@ -291,7 +268,7 @@ void main() {
 
     setUp(() {
       // maxHR = 185 (measured), restingHR = 60, HRR = 125
-      const profile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
+      final profile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
       config = calculateZones(profile)!;
     });
 
@@ -316,7 +293,7 @@ void main() {
 
   group('ZoneMethod.hrrKarvonen with age-based max', () {
     test('reliability is medium (estimated via Tanaka)', () {
-      const profile = HealthProfile(age: 40, restingHr: 60);
+      final profile = HealthProfile(age: 40, restingHr: 60);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.hrrKarvonen);
       expect(config.reliability, ZoneReliability.medium);
@@ -331,7 +308,7 @@ void main() {
     late ZoneConfiguration config;
 
     setUp(() {
-      const profile = HealthProfile(measuredMaxHr: 185);
+      final profile = HealthProfile(measuredMaxHr: 185);
       config = calculateZones(profile)!;
     });
 
@@ -353,7 +330,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('ZoneMethod.percentOfEstimatedMax (Tanaka default)', () {
     test('age 40 → Tanaka max 180', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.medium);
@@ -361,19 +338,19 @@ void main() {
     });
 
     test('age 30 → Tanaka max 187 (differs from Fox 190)', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(profile)!;
       expect(config.maxHr, 187);
     });
 
     test('reason references Tanaka formula', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(profile)!;
       expect(config.reason, contains('Tanaka'));
     });
 
     test('fox220 opt-in yields 220 − age', () {
-      const profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.fox220);
+      final profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.fox220);
       final config = calculateZones(profile)!;
       expect(config.maxHr, 190);
       expect(config.reason, contains('Fox'));
@@ -387,7 +364,7 @@ void main() {
     late ZoneConfiguration config;
 
     setUp(() {
-      const profile = HealthProfile(lactateThresholdHr: 160);
+      final profile = HealthProfile(lactateThresholdHr: 160);
       config = calculateZones(profile)!;
     });
 
@@ -429,7 +406,7 @@ void main() {
 
   group('LTHR caution-mode and priority', () {
     test('caution flag + LTHR → lthrFriel, low reliability', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         lactateThresholdHr: 155,
         betaBlocker: true,
       );
@@ -441,7 +418,7 @@ void main() {
     });
 
     test('clinician cap beats LTHR', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         clinicianMaxHr: 150,
         lactateThresholdHr: 160,
       );
@@ -449,7 +426,7 @@ void main() {
     });
 
     test('LTHR beats Karvonen when both inputs are available', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         measuredMaxHr: 190,
         restingHr: 60,
         lactateThresholdHr: 160,
@@ -463,7 +440,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('priority chain', () {
     test('custom beats clinician cap', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         clinicianMaxHr: 160,
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
@@ -477,7 +454,7 @@ void main() {
     });
 
     test('clinician cap beats hrr', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         clinicianMaxHr: 160,
         measuredMaxHr: 185,
         restingHr: 60,
@@ -486,12 +463,12 @@ void main() {
     });
 
     test('hrr beats percent-of-measured', () {
-      const profile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
+      final profile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
       expect(calculateZones(profile)!.method, ZoneMethod.hrrKarvonen);
     });
 
     test('percent-of-measured beats percent-of-estimated', () {
-      const profile = HealthProfile(age: 40, measuredMaxHr: 185);
+      final profile = HealthProfile(age: 40, measuredMaxHr: 185);
       expect(calculateZones(profile)!.method, ZoneMethod.percentOfMeasuredMax);
     });
   });
@@ -501,13 +478,13 @@ void main() {
   // -------------------------------------------------------------------------
   group('label overrides', () {
     test('default labels include "Zone 1 – Recovery"', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(profile)!;
       expect(config.zones[0].label, 'Zone 1 – Recovery');
     });
 
     test('default effortLabels include "Moderate" at zone 3', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(profile)!;
       expect(config.zones[2].effortLabel, 'Moderate');
       expect(config.zones[2].descriptiveLabel, 'Aerobic');
@@ -515,7 +492,7 @@ void main() {
     });
 
     test('labels parameter overrides combined labels only', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(
         profile,
         labels: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'],
@@ -525,7 +502,7 @@ void main() {
     });
 
     test('effortLabels and descriptiveLabels overrides', () {
-      const profile = HealthProfile(age: 30);
+      final profile = HealthProfile(age: 30);
       final config = calculateZones(
         profile,
         effortLabels: ['a', 'b', 'c', 'd', 'e'],
@@ -549,7 +526,7 @@ void main() {
         (80.0, 90.0),
         (90.0, 100.0),
       ];
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final config = calculateZones(profile, bands: customBands)!;
       expect(config.zones[0].lowerBound, 81);
       expect(config.zones[0].lowerPercent, 0.45);
@@ -563,7 +540,7 @@ void main() {
     late ZoneConfiguration config;
 
     setUp(() {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       config = calculateZones(profile)!;
     });
 
@@ -685,7 +662,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('ZoneConfiguration.toString', () {
     test('includes method, reliability, maxHr', () {
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final s = calculateZones(profile)!.toString();
       expect(s, contains('percentOfEstimatedMax'));
       expect(s, contains('medium'));
@@ -699,7 +676,7 @@ void main() {
   // asserts are stripped.
   // -------------------------------------------------------------------------
   group('override list length validation', () {
-    const profile = HealthProfile(age: 30);
+    final profile = HealthProfile(age: 30);
 
     test('bands length != 5 throws ArgumentError', () {
       expect(
@@ -752,7 +729,7 @@ void main() {
         0xFF444444,
         0xFF555555,
       ];
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final config = calculateZones(profile, colors: colours)!;
       for (var i = 0; i < 5; i++) {
         expect(config.zones[i].color, colours[i]);
@@ -765,7 +742,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Caution mode with only estimated max', () {
     test('age + betaBlocker → percentOfEstimatedMax, low reliability', () {
-      const profile = HealthProfile(age: 49, betaBlocker: true);
+      final profile = HealthProfile(age: 49, betaBlocker: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.low);
@@ -775,7 +752,7 @@ void main() {
     });
 
     test('age + heartCondition alone also downgrades estimated-max path', () {
-      const profile = HealthProfile(age: 55, heartCondition: true);
+      final profile = HealthProfile(age: 55, heartCondition: true);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.low);
@@ -788,7 +765,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Clinician cap reason string', () {
     test('reason mentions clinician, not caution, with beta blocker', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 49,
         clinicianMaxHr: 150,
         betaBlocker: true,
@@ -800,7 +777,7 @@ void main() {
     });
 
     test('reason unchanged when both caution flags set', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         clinicianMaxHr: 140,
         betaBlocker: true,
         heartCondition: true,
@@ -815,7 +792,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Nes formula through calculateZones', () {
     test('age 30 with Nes → max 192, reason references Nes', () {
-      const profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
+      final profile = HealthProfile(age: 30, maxHrFormula: MaxHrFormula.nes);
       final config = calculateZones(profile)!;
       expect(config.maxHr, 192);
       expect(config.reason, contains('Nes'));
@@ -828,7 +805,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('Extra formulas through calculateZones', () {
     test('age 40 with Gellish → max 179, reason references Gellish', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         maxHrFormula: MaxHrFormula.gellish2007,
       );
@@ -839,7 +816,7 @@ void main() {
     });
 
     test('age 40 with Åstrand → max 183, reason references Åstrand', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         maxHrFormula: MaxHrFormula.astrand,
       );
@@ -849,7 +826,7 @@ void main() {
     });
 
     test('age 40 with Miller–Faulkner → max 183, reason mentions Miller', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         maxHrFormula: MaxHrFormula.millerFaulkner,
       );
@@ -866,7 +843,7 @@ void main() {
     test('uses 220 − age for max HR in Karvonen formula', () {
       // max = 220 − 40 = 180, HRR = 180 − 60 = 120.
       // zone 1 lower = 120 × 0.50 + 60 = 120.
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         age: 40,
         restingHr: 60,
         maxHrFormula: MaxHrFormula.fox220,
@@ -883,7 +860,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('custom zone percentages', () {
     test('lowerPercent and upperPercent are 0 for all custom zones', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 95,
           zone2Lower: 114,
@@ -906,7 +883,7 @@ void main() {
   group('currentZoneFromConfig at zone boundary', () {
     test('bpm at zone N upper bound is in zone N+1 (upper is exclusive)', () {
       // Age 40, Tanaka → max 180. Zone 1 upper = 108, which is zone 2's lower.
-      const profile = HealthProfile(age: 40);
+      final profile = HealthProfile(age: 40);
       final config = calculateZones(profile)!;
       final boundary = config.zones[0].upperBound!;
       expect(config.zones[1].lowerBound, boundary);
@@ -921,7 +898,7 @@ void main() {
   group('Clinician cap with resting HR (Karvonen personalisation)', () {
     test('lower zones are anchored above the resting HR', () {
       // Clinician cap 150, resting 90 → HRR 60. Zone 1 lower = 90 + 50% × 60.
-      const profile = HealthProfile(clinicianMaxHr: 150, restingHr: 90);
+      final profile = HealthProfile(clinicianMaxHr: 150, restingHr: 90);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.clinicianCap);
       expect(config.reliability, ZoneReliability.high);
@@ -933,7 +910,7 @@ void main() {
     });
 
     test('beta-blocker + clinician cap + resting stays high reliability', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         clinicianMaxHr: 150,
         restingHr: 60,
         betaBlocker: true,
@@ -946,7 +923,7 @@ void main() {
     });
 
     test('clinician cap without resting HR keeps flat percentage bands', () {
-      const profile = HealthProfile(clinicianMaxHr: 160);
+      final profile = HealthProfile(clinicianMaxHr: 160);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.clinicianCap);
       expect(config.zones[0].lowerBound, 80); // 50% of 160
@@ -955,7 +932,7 @@ void main() {
     test('resting HR at or above the clinician cap keeps flat bands', () {
       // No positive reserve against the cap → fall back to percentage bands
       // rather than inverted Karvonen zones.
-      const profile = HealthProfile(clinicianMaxHr: 120, restingHr: 130);
+      final profile = HealthProfile(clinicianMaxHr: 120, restingHr: 130);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.clinicianCap);
       expect(config.zones[0].lowerBound, 60); // 50% of 120
@@ -967,7 +944,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('LTHR zone 5 upperPercent', () {
     test('default Friel zone 5 upperPercent is 1.1', () {
-      const profile = HealthProfile(lactateThresholdHr: 160);
+      final profile = HealthProfile(lactateThresholdHr: 160);
       final config = calculateZones(profile)!;
       expect(config.method, ZoneMethod.lthrFriel);
       expect(config.zones[4].upperPercent, closeTo(1.1, 1e-9));
@@ -979,8 +956,9 @@ void main() {
   // -------------------------------------------------------------------------
   group('custom zone label length validation', () {
     test('fewer than 5 custom labels throws ArgumentError, not RangeError', () {
-      const profile = HealthProfile(
-        customZones: CustomZoneBoundary(
+      // Now rejected at construction rather than by calculateZones.
+      expect(
+        () => CustomZoneBoundary(
           zone1Lower: 100,
           zone2Lower: 120,
           zone3Lower: 140,
@@ -988,12 +966,12 @@ void main() {
           zone5Lower: 180,
           labels: ['Easy', 'Steady', 'Tempo', 'Hard'],
         ),
+        throwsArgumentError,
       );
-      expect(() => calculateZones(profile), throwsArgumentError);
     });
 
     test('exactly 5 custom labels is accepted', () {
-      const profile = HealthProfile(
+      final profile = HealthProfile(
         customZones: CustomZoneBoundary(
           zone1Lower: 100,
           zone2Lower: 120,

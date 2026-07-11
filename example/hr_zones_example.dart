@@ -7,7 +7,7 @@ void main() {
   print('=== hr_zones package demo ===\n');
 
   _printSection('Method 1 – Custom zones');
-  const customProfile = HealthProfile(
+  final customProfile = HealthProfile(
     customZones: CustomZoneBoundary(
       zone1Lower: 95,
       zone2Lower: 114,
@@ -19,31 +19,31 @@ void main() {
   _printConfig(calculateZones(customProfile)!);
 
   _printSection('Method 2 – Clinician cap');
-  const clinicianProfile = HealthProfile(clinicianMaxHr: 160);
+  final clinicianProfile = HealthProfile(clinicianMaxHr: 160);
   _printConfig(calculateZones(clinicianProfile)!);
 
   _printSection('Method 3 – HRR/Karvonen (measured max HR)');
-  const hrrMeasuredProfile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
+  final hrrMeasuredProfile = HealthProfile(measuredMaxHr: 185, restingHr: 60);
   _printConfig(calculateZones(hrrMeasuredProfile)!);
 
   _printSection('Method 4 – Percent of measured max');
-  const measuredMaxProfile = HealthProfile(measuredMaxHr: 185);
+  final measuredMaxProfile = HealthProfile(measuredMaxHr: 185);
   _printConfig(calculateZones(measuredMaxProfile)!);
 
   _printSection('Method 5a – Percent of estimated max (Tanaka, default)');
-  const estimatedProfile = HealthProfile(age: 35);
+  final estimatedProfile = HealthProfile(age: 35);
   _printConfig(calculateZones(estimatedProfile)!);
 
   _printSection('Method 5b – Percent of estimated max (Fox 220, legacy)');
-  const foxProfile = HealthProfile(age: 35, maxHrFormula: MaxHrFormula.fox220);
+  final foxProfile = HealthProfile(age: 35, maxHrFormula: MaxHrFormula.fox220);
   _printConfig(calculateZones(foxProfile)!);
 
   _printSection('Method 6 – LTHR (Friel zones)');
-  const frielProfile = HealthProfile(lactateThresholdHr: 160);
+  final frielProfile = HealthProfile(lactateThresholdHr: 160);
   _printConfig(calculateZones(frielProfile)!);
 
   _printSection('Clinician cap wins over caution mode');
-  const cautionProfile = HealthProfile(
+  final cautionProfile = HealthProfile(
     age: 55,
     clinicianMaxHr: 140,
     betaBlocker: true,
@@ -51,7 +51,7 @@ void main() {
   _printConfig(calculateZones(cautionProfile)!);
 
   _printSection('Time-in-zone analysis (active session, 1 Hz cadence)');
-  const timeProfile = HealthProfile(age: 40);
+  final timeProfile = HealthProfile(age: 40);
   final zoneConfig = calculateZones(timeProfile)!;
 
   // Simulate 5 minutes of 1-Hz readings climbing into zone 4 then cooling back.
@@ -113,7 +113,7 @@ void _printTime(List<HrReading> readings, ZoneConfiguration config) {
   final edwards = calculateEdwardsTrimp(summary);
   final banister = calculateBanisterTrimp(
     readings,
-    const HealthProfile(age: 40, restingHr: 60),
+    HealthProfile(age: 40, restingHr: 60),
   );
   print('Edwards TRIMP: ${edwards.toStringAsFixed(1)}');
   if (banister != null) {
