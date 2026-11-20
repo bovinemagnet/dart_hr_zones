@@ -20,8 +20,8 @@ enum ZoneMethod {
 
   /// Heart-Rate Reserve (Karvonen) method:
   /// `targetHR = (maxHR − restingHR) × intensity + restingHR`.
-  /// Requires both a maximum heart rate (measured or estimated) and a resting
-  /// heart rate.
+  /// Requires both a measured maximum heart rate and a resting heart rate.
+  /// An age-estimated maximum uses [percentOfEstimatedMax] instead.
   hrrKarvonen,
 
   /// Percentage-of-measured-maximum method.
@@ -329,12 +329,10 @@ const List<int> _defaultColors = [
 ///    caution mode because the clinician's guidance is authoritative.
 /// 3. [ZoneMethod.lthrFriel] — if [HealthProfile.lactateThresholdHr] is set.
 ///    LTHR is a measured threshold value; when available it anchors zones
-///    more accurately than an HRR/Karvonen fallback that may use an
-///    age-estimated max.
-/// 4. [ZoneMethod.hrrKarvonen] — if both a max HR (measured or estimated) and
-///    [HealthProfile.restingHr] are available, and the resting HR is below
-///    the max (a positive heart-rate reserve). Otherwise the chain falls
-///    through to the percentage methods.
+///    more accurately than a max-HR method.
+/// 4. [ZoneMethod.hrrKarvonen] — if both [HealthProfile.measuredMaxHr] and
+///    [HealthProfile.restingHr] are available. An age-estimated max never
+///    uses Karvonen; resting HR is ignored for zones and step 6 applies.
 /// 5. [ZoneMethod.percentOfMeasuredMax] — if [HealthProfile.measuredMaxHr]
 ///    is set.
 /// 6. [ZoneMethod.percentOfEstimatedMax] — using
@@ -421,8 +419,8 @@ ZoneConfiguration? calculateZones(
   }
 
   // 3. LTHR (Friel) — anchored on a measured lactate threshold value. Runs
-  // below the clinician cap but above HRR/Karvonen: LTHR is measured data
-  // whereas Karvonen may be falling back to an age-estimated max.
+  // below the clinician cap but above HRR/Karvonen: a threshold anchors the
+  // training zones more directly than a maximum does.
   final lthr = profile.lactateThresholdHr;
   if (lthr != null) {
     final reliability = profile.isCautionMode
@@ -458,14 +456,17 @@ ZoneConfiguration? calculateZones(
     );
   }
 
-  // 4. HRR / Karvonen — a positive heart-rate reserve is guaranteed here
-  // (the inconsistent case above has already thrown).
-  if (resolvedMax != null && restingHr != null) {
+  // 4. HRR / Karvonen — only on a measured max. The default bands applied to
+  // the reserve of an age-estimated max put zone 1 at moderate effort, and
+  // the estimate's error is carried into every zone. A positive heart-rate
+  // reserve is guaranteed here (the inconsistent case above has thrown).
+  final measuredMax = profile.measuredMaxHr;
+  if (measuredMax != null && restingHr != null) {
     final reliability = profile.isCautionMode
         ? ZoneReliability.low
-        : _maxHrReliability(profile, resolvedMax);
+        : ZoneReliability.high;
     return _hrrZones(
-      maxHr: resolvedMax,
+      maxHr: measuredMax,
       restingHr: restingHr,
       reliability: reliability,
       reason: _reasonFor(profile, ZoneMethod.hrrKarvonen, reliability),
@@ -478,7 +479,6 @@ ZoneConfiguration? calculateZones(
   }
 
   // 5. Percent of measured max
-  final measuredMax = profile.measuredMaxHr;
   if (measuredMax != null) {
     final reliability = profile.isCautionMode
         ? ZoneReliability.low
@@ -547,20 +547,12 @@ void _require5(int length, String name) {
   }
 }
 
-/// Resolves the best max HR available for Karvonen / percentage methods.
-/// Measured max takes priority; otherwise falls back to the configured
-/// age-based formula. Returns `null` when neither is available.
+/// Resolves the max HR that a resting HR is checked against: the measured
+/// max, otherwise the configured age-based estimate. Returns `null` when
+/// neither is available.
 int? _resolveMaxHr(HealthProfile profile) {
   if (profile.measuredMaxHr != null) return profile.measuredMaxHr;
   return profile.estimatedMaxHr;
-}
-
-/// Derives reliability from the type of max HR available (non-caution).
-ZoneReliability _maxHrReliability(HealthProfile profile, int resolvedMax) {
-  if (profile.measuredMaxHr != null && resolvedMax == profile.measuredMaxHr) {
-    return ZoneReliability.high;
-  }
-  return ZoneReliability.medium;
 }
 
 /// Builds the reason string for non-custom / non-clinician methods.

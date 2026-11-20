@@ -10,8 +10,8 @@ flowchart TD
     C -- Yes --> LOW([low])
     C -- No  --> D{Anchor type?}
 
-    D -- measuredMaxHr\nor LTHR\nor clinicianCap --> HIGH3([high])
-    D -- age-estimated\nmaxHr --> MED([medium])
+    D -- measuredMaxHr\nor Karvonen on\nmeasured max\nor LTHR\nor clinicianCap --> HIGH3([high])
+    D -- age-estimated maxHr\nrestingHr ignored --> MED([medium])
 
     classDef high fill:#2E7D32,color:#fff,stroke:#1B5E20
     classDef medium fill:#E65100,color:#fff,stroke:#BF360C

@@ -8,7 +8,7 @@ flowchart TD
     B -- No  --> C{lactateThresholdHr set?}
 
     C -- Yes --> M3[ZoneMethod.lthrFriel]
-    C -- No  --> D{restingHr set AND\nmaxHr resolvable?}
+    C -- No  --> D{restingHr set AND\nmeasuredMaxHr set?}
 
     D -- Yes --> M4[ZoneMethod.hrrKarvonen]
     D -- No  --> E{measuredMaxHr set?}

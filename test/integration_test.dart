@@ -47,11 +47,11 @@ void main() {
         'drives a coherent time-in-zone summary', () {
       final profile = HealthProfile(age: 49, restingHr: 60, betaBlocker: true);
       final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.hrrKarvonen);
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.low);
       expect(config.reason, contains('Caution'));
 
-      // At age 49, Karvonen zone 1 lower ≈ 117 bpm. Keep all readings above
+      // At age 49 (Tanaka max 174), zone 1 lower = 87 bpm. Keep all readings above
       // that so every interval lands in a zone and the summed total equals the
       // wall-clock span.
       final readings = [

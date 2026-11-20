@@ -24,11 +24,12 @@ final config = calculateZones(HealthProfile(
   betaBlocker: true,
 ))!;
 
-print(config.method.name);      // hrrKarvonen
+print(config.method.name);      // percentOfEstimatedMax
 print(config.reliability.name); // low
 print(config.reason);
-// "Caution mode (beta blocker medication reported). Using heart rate reserve
-//  (Karvonen) method. Consider setting a clinician-provided maximum heart rate."
+// "Caution mode (beta blocker medication reported). Using age-estimated
+//  maximum heart rate (Tanaka). Consider setting a clinician-provided maximum
+//  heart rate."
 ----
 
 == Why beta-blockers matter

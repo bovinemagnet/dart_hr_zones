@@ -98,10 +98,9 @@ sufficient data:
    is taken as the definitive maximum.
 3. **LTHR (Friel)** — if `lactateThresholdHr` is set. A measured threshold
    value is a stronger anchor than the HRR fallback when one is available.
-4. **HRR / Karvonen** — if a max HR (measured or age-estimated) **and**
-   `restingHr` are available, and the resting HR is below the max (a
-   positive heart-rate reserve); otherwise the chain falls through to the
-   percentage methods.
+4. **HRR / Karvonen** — if `measuredMaxHr` **and** `restingHr` are set. An
+   age-estimated max never uses Karvonen: `restingHr` is ignored for zones
+   and step 6 applies.
 5. **Percent of measured max** — if `measuredMaxHr` is set.
 6. **Percent of estimated max** — using `HealthProfile.maxHrFormula` (Tanaka
    by default).
@@ -165,8 +164,14 @@ targetHR = (maxHR − restingHR) × intensity + restingHR
 ```
 
 Uses the Heart Rate Reserve so zones scale correctly for fit athletes with a
-low resting HR. Reliability: **high** (measured max) / **medium** (estimated
-max) / **low** (caution mode without clinician cap).
+low resting HR. Requires a measured max HR. Reliability: **high** (or **low**
+with caution flags and no clinician cap).
+
+Karvonen is not applied to an age-estimated max. The default bands are
+percentages of max HR; applied to the reserve they shift every zone up. For
+age 52 (Tanaka max 172) and resting HR 65, zone 1 "Recovery" would start at
+119 bpm, 69 % of max, which is moderate effort. The estimate's error would
+also be carried into every zone.
 
 ```dart
 calculateZones(HealthProfile(measuredMaxHr: 185, restingHr: 60));

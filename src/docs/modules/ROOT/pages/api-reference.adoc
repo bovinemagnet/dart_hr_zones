@@ -45,7 +45,7 @@ Input model. All fields are optional — supply as many as are known.
 |Field |Type |Description
 
 |`age` |`int?` |Age in years. Drives `estimatedMaxHr`.
-|`restingHr` |`int?` |Resting HR in bpm. Required for Karvonen.
+|`restingHr` |`int?` |Resting HR in bpm. Karvonen needs this together with `measuredMaxHr`; with only an age-estimated max it is ignored for zones. Still used by Banister TRIMP.
 |`measuredMaxHr` |`int?` |Lab- or field-tested maximum HR.
 |`clinicianMaxHr` |`int?` |Prescriber-specified cap. Authoritative; overrides caution.
 |`lactateThresholdHr` |`int?` |Measured LTHR for the Friel method.
@@ -185,7 +185,7 @@ Holds the `a` and `b` weighting pair for Banister TRIMP.
 |`custom` |Explicit BPM lower bounds via `CustomZoneBoundary`.
 |`clinicianCap` |Percentage of clinician-prescribed max HR.
 |`lthrFriel` |Friel five-zone bands anchored on LTHR.
-|`hrrKarvonen` |Heart rate reserve (Karvonen) method.
+|`hrrKarvonen` |Heart rate reserve (Karvonen) method. Requires `measuredMaxHr` and `restingHr`.
 |`percentOfMeasuredMax` |Percentage of measured max HR.
 |`percentOfEstimatedMax` |Percentage of age-estimated max HR.
 |===
@@ -197,7 +197,7 @@ Holds the `a` and `b` weighting pair for Banister TRIMP.
 |Value |Description
 
 |`high` |Custom, clinician cap, or measured data without caution flags.
-|`medium` |Age-estimated max without caution flags.
+|`medium` |Age-estimated max without caution flags (Karvonen is never `medium`).
 |`low` |Any non-clinician-cap method with caution mode active.
 |===
 
