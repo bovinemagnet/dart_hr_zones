@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2026-11-21
+
+### Changed
+
+- `calculateZones` uses HRR/Karvonen only when `measuredMaxHr` and
+  `restingHr` are both set. With an age-estimated max, `restingHr` is ignored
+  for zones and the result is `ZoneMethod.percentOfEstimatedMax` (reliability
+  `medium`, or `low` in caution mode).
+
+  The default bands are percentages of max HR. Applied to the reserve of an
+  estimated max they put zone 1 at moderate effort: for age 52 with resting
+  HR 65, zone 1 was 119–129 bpm and is now 86–103 bpm. Callers that relied on
+  Karvonen with only `age` and `restingHr` will see lower zone boundaries.
+  Training load (`calculateBanisterTrimp`) is unchanged.
+
 ## [0.0.2] - 2026-04-17
 
 ### Added
