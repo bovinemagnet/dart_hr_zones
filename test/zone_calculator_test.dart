@@ -224,10 +224,10 @@ void main() {
   // Caution mode without clinician cap → low reliability
   // -------------------------------------------------------------------------
   group('Caution mode without clinician cap', () {
-    test('falls through to hrrKarvonen with low reliability', () {
+    test('falls through to percentOfEstimatedMax with low reliability', () {
       final profile = HealthProfile(age: 49, restingHr: 60, betaBlocker: true);
       final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.hrrKarvonen);
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.low);
       expect(config.reason, contains('Caution'));
       expect(config.reason, contains('beta blocker'));
@@ -284,13 +284,28 @@ void main() {
     });
   });
 
-  group('ZoneMethod.hrrKarvonen with age-based max', () {
-    test('reliability is medium (estimated via Tanaka)', () {
-      final profile = HealthProfile(age: 40, restingHr: 60);
-      final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.hrrKarvonen);
+  // -------------------------------------------------------------------------
+  // An age-estimated max ignores resting HR
+  // -------------------------------------------------------------------------
+  group('age-estimated max with resting HR', () {
+    // Age 52 (Tanaka max 172) with resting HR 65. Karvonen on the estimate
+    // put zone 1 at 119–129 bpm (50 % of reserve), which is moderate effort,
+    // not recovery.
+    late ZoneConfiguration config;
+
+    setUp(() {
+      final profile = HealthProfile(age: 52, restingHr: 65);
+      config = calculateZones(profile)!;
+    });
+
+    test('uses percentOfEstimatedMax, not hrrKarvonen', () {
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.reliability, ZoneReliability.medium);
-      expect(config.maxHr, 180);
+      expect(config.maxHr, 172);
+    });
+
+    test('zone lower bounds are percentages of the estimated max', () {
+      expect(config.zones.map((z) => z.lowerBound), [86, 103, 120, 138, 155]);
     });
   });
 
@@ -827,21 +842,21 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Karvonen with fox220 opt-in (age-estimated max)
+  // fox220 opt-in with resting HR (age-estimated max)
   // -------------------------------------------------------------------------
-  group('Karvonen with fox220', () {
-    test('uses 220 − age for max HR in Karvonen formula', () {
-      // max = 220 − 40 = 180, HRR = 180 − 60 = 120.
-      // zone 1 lower = 120 × 0.50 + 60 = 120.
+  group('fox220 with resting HR', () {
+    test('uses 220 − age as a percentage-of-max anchor', () {
+      // max = 220 − 40 = 180; zone 1 lower = 180 × 0.50 = 90.
+      // Resting HR does not apply to an age-estimated max.
       final profile = HealthProfile(
         age: 40,
         restingHr: 60,
         maxHrFormula: MaxHrFormula.fox220,
       );
       final config = calculateZones(profile)!;
-      expect(config.method, ZoneMethod.hrrKarvonen);
+      expect(config.method, ZoneMethod.percentOfEstimatedMax);
       expect(config.maxHr, 180);
-      expect(config.zones[0].lowerBound, 120);
+      expect(config.zones[0].lowerBound, 90);
     });
   });
 

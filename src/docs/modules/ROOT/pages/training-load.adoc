@@ -44,8 +44,8 @@ final readings = [
   HrReading(bpm: 158, elapsed: Duration(minutes: 40)),  // final reading (not an interval start)
 ];
 
-final config = calculateZones(HealthProfile(age: 35, restingHr: 60))!;
-// HRR/Karvonen zones (max HR 184 bpm, resting HR 60 bpm): zone 1 = 122–134 bpm, zone 2 = 134–147 bpm.
+final config = calculateZones(HealthProfile(measuredMaxHr: 184, restingHr: 60))!;
+// HRR/Karvonen zones (measured max HR 184 bpm, resting HR 60 bpm): zone 1 = 122–134 bpm, zone 2 = 134–147 bpm.
 final summary = calculateTimeInZones(readings, config);
 final edwards = calculateEdwardsTrimp(summary);
 

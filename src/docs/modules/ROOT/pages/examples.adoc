@@ -60,7 +60,7 @@ Zone 5 – VO2 Max: 166–max bpm  [Very Hard]
 === Notes
 
 * The `medium` reliability signals that the zones are based on an estimate.
-  The runner should aim to obtain a measured max HR or resting HR to improve accuracy.
+  The runner should aim to obtain a measured max HR to improve accuracy (a resting HR alone does not change the zones).
 * With `age: 35` and the default Tanaka formula, estimated max HR = `208 − 0.7 × 35 = 183.5 → 184 bpm`.
 * To display a reliability indicator in a UI, check `config.reliability` and show `config.reason` as a subtitle.
 

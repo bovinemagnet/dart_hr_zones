@@ -169,16 +169,16 @@ for (final zone in config.zones) {
 
 == HRR / Karvonen
 
-*Priority:* 4 | *Reliability:* `high` (measured max, no caution), `medium` (estimated max, no caution), `low` (caution mode, no clinician cap)
+*Priority:* 4 | *Reliability:* `high` (no caution), `low` (caution mode, no clinician cap)
 
 === When to use
 
-Use HRR/Karvonen when you have a resting heart rate.
+Use HRR/Karvonen when you have both a measured max HR and a resting heart rate.
 It scales zones relative to the usable heart rate range (max minus resting), which makes zones more accurate for athletes with a low resting HR than a simple percentage of max.
 
 === Required inputs
 
-`HealthProfile.restingHr` plus either `measuredMaxHr` or `age` (for an estimated max).
+`HealthProfile.restingHr` *and* `HealthProfile.measuredMaxHr`. An age-estimated max is deliberately not accepted: see <<karvonen-estimated>>.
 
 === Formula
 
@@ -193,25 +193,28 @@ Where `intensity` is the lower or upper bound percentage for the zone.
 
 [source,dart]
 ----
-// With measured max — reliability: high
 final config = calculateZones(HealthProfile(
   measuredMaxHr: 185,
   restingHr: 58,
 ))!;
 // method: hrrKarvonen, reliability: high
 
-// With age only — reliability: medium
+// With age only, restingHr is ignored for zones
 final config2 = calculateZones(HealthProfile(
   age: 35,
   restingHr: 58,
 ))!;
-// method: hrrKarvonen, reliability: medium
+// method: percentOfEstimatedMax, reliability: medium
 ----
 
 === Gotchas
 
-* If `restingHr` is missing, Karvonen is skipped and the calculator falls back to percent-of-measured-max or percent-of-estimated-max.
-* The `measuredMaxHr` is preferred over an age estimate when both are available.
+* If `restingHr` is missing, Karvonen is skipped and the calculator falls back to percent-of-measured-max.
+* If `measuredMaxHr` is missing, Karvonen is skipped even when `restingHr` is set, and the calculator falls back to percent-of-estimated-max.
+* [[karvonen-estimated]]Karvonen is never applied to an age-estimated max. The default bands (50/60/70/80/90 %) are percentages of the reserve, so they sit well above the same percentages of max.
+  For age 52 (Tanaka max 172) with a resting HR of 65, Karvonen would place zone 1 at 119–129 bpm, which is 69–75 % of max and moderate intensity by ACSM classification rather than recovery.
+  Percent of estimated max gives 86–103 / 103–120 / 120–138 / 138–155 / 155–172 bpm.
+  Any error in the age estimate would also be carried into every Karvonen zone.
 
 == Percent of measured max
 
@@ -240,7 +243,7 @@ final config = calculateZones(HealthProfile(measuredMaxHr: 188))!;
 
 === When to use
 
-This is the fallback method when only age is known.
+This is the fallback method when only age is known, including when a resting HR is supplied without a measured max (resting HR is ignored for zones).
 It uses `HealthProfile.maxHrFormula` (default: Tanaka) to estimate max HR and applies the standard percentage bands to that estimate.
 
 === Required inputs

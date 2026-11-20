@@ -87,14 +87,15 @@ NOTE: `calculateZones` returns `null` only when no method in the priority chain 
 
 == Adding a resting heart rate
 
-Supplying `restingHr` unlocks the HRR/Karvonen method, which scales zones relative to your usable heart rate range and is considered more accurate for fit athletes with a low resting HR:
+Supplying `restingHr` on its own does not change the zones.
+The HRR/Karvonen method needs a measured max HR as well, because applying reserve-based bands to an age-estimated max overstates every zone and carries the estimate's error into them:
 
 [source,dart]
 ----
 final profile = HealthProfile(age: 35, restingHr: 58);
 final config = calculateZones(profile)!;
 
-print('Method: ${config.method.name}');   // hrrKarvonen
+print('Method: ${config.method.name}');   // percentOfEstimatedMax
 print('Reliability: ${config.reliability.name}'); // medium (age-estimated max)
 ----
 
