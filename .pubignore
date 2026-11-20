@@ -1,0 +1,31 @@
+# Files excluded from `dart pub publish`.
+# When present, pub uses this file instead of .gitignore, so the entries from
+# .gitignore are mirrored below alongside the publish-only additions.
+
+# Tooling outputs and local caches (mirrors .gitignore).
+.dart_tool/
+.packages
+build/
+pubspec.lock
+doc/api/
+.env*
+*.dart.js
+*.info.json
+*.js
+*.js_
+*.js.deps
+*.js.map
+.flutter-plugins
+.flutter-plugins-dependencies
+CLAUDE.md
+
+# Antora documentation component.
+# The source lives in this repository so the docs are versioned alongside the
+# code, but pub.dev consumers get the README and CHANGELOG only — there is no
+# need to ship an ~80 KB AsciiDoc tree inside the .tar.gz archive.
+src/docs/
+antora-playbook.yml
+
+# CI and editor config — not useful to pub consumers.
+.github/
+editorconfig

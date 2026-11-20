@@ -8,6 +8,26 @@ This project adheres to https://semver.org/spec/v2.0.0.html[Semantic Versioning]
 
 For the complete raw changelog, see `CHANGELOG.md` in the https://github.com/bovinemagnet/dart_hr_zones[repository].
 
+== 0.0.3 (2026-11-21)
+
+=== Changes
+
+Karvonen needs a measured max::
+`calculateZones` uses HRR/Karvonen only when `measuredMaxHr` and `restingHr` are both set.
+With an age-estimated max, `restingHr` is ignored for zones and the result is `percentOfEstimatedMax` (`medium`, or `low` in caution mode).
+The default bands are percentages of max HR; applied to the reserve of an estimated max they put zone 1 at moderate effort.
+For age 52 with resting HR 65, zone 1 was 119–129 bpm and is now 86–103 bpm.
+Training load is unchanged.
+
+Antora documentation excluded from the pub.dev archive::
+A new `.pubignore` keeps the AsciiDoc documentation source (`src/docs/`), the Antora playbook, CI config, and editor config out of the published `.tar.gz`.
+Archive size drops from roughly 51 KB to 32 KB.
+The documentation still lives in the repository for those who want to build the site locally.
+
+Automated publish disabled::
+The `.github/workflows/publish.yaml` workflow's final `dart pub publish` step is commented out while automated publishing from GitHub Actions is not enabled on pub.dev.
+Tag pushes continue to run analyze, test, and `pub publish --dry-run` as release validation.
+
 == 0.0.2 (2026-04-17)
 
 === New features

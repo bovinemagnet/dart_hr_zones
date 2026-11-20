@@ -44,7 +44,7 @@ final readings = [
   HrReading(bpm: 158, elapsed: Duration(minutes: 40)),  // 20 min in zone 3
 ];
 
-final config = calculateZones(HealthProfile(age: 35, restingHr: 60))!;
+final config = calculateZones(HealthProfile(measuredMaxHr: 184, restingHr: 60))!;
 final summary = calculateTimeInZones(readings, config);
 final edwards = calculateEdwardsTrimp(summary);
 
